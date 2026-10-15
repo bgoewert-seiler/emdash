@@ -23,7 +23,7 @@ export type IntegrationHostContext = {
  * Context for feature-plugin data behaviors. The host loads stored
  * credentials before invoking the plugin and short-circuits with a uniform
  * not-connected error when none exist, so `credentials` is always present
- * here. The host scopes the context to one account, keeping plugins
+ * here (empty for integrations without auth methods). The host scopes the context to one account, keeping plugins
  * account-agnostic.
  */
 export type ConnectedIntegrationHostContext = IntegrationHostContext & {

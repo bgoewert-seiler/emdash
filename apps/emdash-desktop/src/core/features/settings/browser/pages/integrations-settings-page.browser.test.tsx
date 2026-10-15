@@ -39,6 +39,9 @@ beforeEach(() => {
         issueCapabilities: {
           requiresRepositoryUrl:
             issues?.capabilities.issues.requiredInputs.includes('repositoryUrl') ?? false,
+          requiresProjectFiles:
+            issues?.capabilities.issues.requiredInputs.includes('projectFiles') ?? false,
+          requiresAccount: provider.capabilities.auth.methods.length > 0,
           supportsIssueContext: !!issues?.behavior.issues?.getIssue,
         },
       };

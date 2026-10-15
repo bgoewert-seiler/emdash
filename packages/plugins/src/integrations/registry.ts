@@ -8,6 +8,7 @@ import { provider as jira } from './impl/jira';
 import { provider as linear } from './impl/linear';
 import { provider as monday } from './impl/monday';
 import { provider as notion } from './impl/notion';
+import { provider as openspec } from './impl/openspec';
 import { provider as plain } from './impl/plain';
 import { provider as plane } from './impl/plane';
 import { provider as trello } from './impl/trello';
@@ -30,6 +31,7 @@ for (const provider of [
   featurebase,
   plain,
   youtrack,
+  openspec,
 ]) {
   integrationPluginRegistry.register(provider);
 }

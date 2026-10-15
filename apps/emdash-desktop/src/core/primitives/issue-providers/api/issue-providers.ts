@@ -7,6 +7,13 @@ export type IssueProviderType = LinkedIssue['provider'];
 
 export type IssueProviderCapabilities = {
   requiresRepositoryUrl: boolean;
+  /** Reads the selected project's files, so it is unusable without a project. */
+  requiresProjectFiles: boolean;
+  /**
+   * False for local sources with no auth methods: they skip account resolution and are offered
+   * only in projects where the source reports itself available.
+   */
+  requiresAccount: boolean;
   supportsIssueContext: boolean;
 };
 

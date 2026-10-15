@@ -157,7 +157,11 @@ describe('IntegrationsProvider', () => {
     const initialInventory = deferred<ProviderAccountsByProvider>();
     const unavailable = new Error('Inventory unavailable');
     mocks.listProviders.mockResolvedValue([
-      { id: 'linear', features: ['issues'], issueCapabilities: { requiresRepositoryUrl: false } },
+      {
+        id: 'linear',
+        features: ['issues'],
+        issueCapabilities: { requiresRepositoryUrl: false, requiresAccount: true },
+      },
     ]);
     mocks.listAccounts.mockReturnValueOnce(initialInventory.promise).mockResolvedValue({
       linear: [{ providerId: 'linear', accountId: 'work', displayName: 'Work', isDefault: true }],

@@ -18,6 +18,16 @@ export type IssueData = {
 };
 
 /**
+ * Read-only view of the selected project's files, keyed by paths relative to
+ * the project root. The host rejects paths that escape the root and works the
+ * same for local and SSH projects. Missing entries read as `null`.
+ */
+export type ProjectFilesReader = {
+  listDirectories(relativePath: string): Promise<string[] | null>;
+  readText(relativePath: string): Promise<string | null>;
+};
+
+/**
  * Inputs are normalized by the host before the plugin is invoked: `limit` is
  * defaulted and clamped, `searchTerm` is trimmed, and empty searches return
  * an empty list without a plugin call. Plugins may apply stricter API caps.
@@ -26,6 +36,8 @@ export type IssueQueryOpts = {
   limit: number;
   /** Resolved repository URL, present when the descriptor requires it. */
   repositoryUrl?: string;
+  /** Project file access, present when the descriptor requires it. */
+  projectFiles?: ProjectFilesReader;
 };
 
 export type IssueSearchOpts = IssueQueryOpts & {
@@ -37,6 +49,13 @@ export type IssueGetOpts = {
   identifier: string;
   /** Resolved repository URL, present when the descriptor requires it. */
   repositoryUrl?: string;
+  /** Project file access, present when the descriptor requires it. */
+  projectFiles?: ProjectFilesReader;
+};
+
+/** Project context for deciding whether a source applies to that project at all. */
+export type IssueAvailabilityOpts = {
+  projectFiles?: ProjectFilesReader;
 };
 
 /**

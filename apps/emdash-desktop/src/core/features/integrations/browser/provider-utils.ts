@@ -13,5 +13,6 @@ export function isProviderUsable(
 ): boolean {
   if (!status?.connected) return false;
   if (status.capabilities.requiresRepositoryUrl && !context.repositoryUrl) return false;
+  if (status.capabilities.requiresProjectFiles && !context.projectId) return false;
   return true;
 }

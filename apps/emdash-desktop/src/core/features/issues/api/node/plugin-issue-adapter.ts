@@ -1,5 +1,8 @@
-import type { ConnectedIntegrationHostContext } from '@emdash/plugins/integrations';
-import type { IssueDetail, IssuesPluginProvider } from '@emdash/plugins/issues';
+import {
+  integrationPluginRegistry,
+  type ConnectedIntegrationHostContext,
+} from '@emdash/plugins/integrations';
+import type { IssueDetail, IssuesPluginProvider, ProjectFilesReader } from '@emdash/plugins/issues';
 import { err, ok, type Result } from '@emdash/shared';
 import type {
   IssueProviderCapabilities,
@@ -14,8 +17,9 @@ import type { IssueProvider } from './issue-provider';
 /** Desktop-owned access and result attribution; only host is passed into the plugin. */
 type ResolvedIssueAccess = {
   host: ConnectedIntegrationHostContext;
-  accountId: string;
+  accountId?: string;
   repositoryUrl?: string;
+  projectFiles?: ProjectFilesReader;
 };
 
 /** Provider adapters prepare access; list/search execution has one policy and result mapping. */
@@ -28,19 +32,24 @@ export function createIssueListOperations(
   async function invoke(opts: IssueQueryOpts, searchTerm?: string): Promise<IssueListResult> {
     const context = await prepare(opts);
     if (!context.success) return context;
-    const { repositoryUrl, host } = context.data;
+    const { repositoryUrl, projectFiles, host } = context.data;
     if (capabilities.requiresRepositoryUrl && !repositoryUrl) {
       return err({ type: 'invalid_input', message: 'Repository URL is required.' });
+    }
+    if (capabilities.requiresProjectFiles && !projectFiles) {
+      return err({ type: 'invalid_input', message: 'An open project is required.' });
     }
     const result =
       searchTerm === undefined
         ? await plugin.behavior.issues?.listIssues(host, {
             limit: clampIssueProviderLimit(opts.limit, DEFAULT_LIST_LIMIT),
             repositoryUrl,
+            projectFiles,
           })
         : await plugin.behavior.issues?.searchIssues(host, {
             limit: clampIssueProviderLimit(opts.limit, DEFAULT_SEARCH_LIMIT),
             repositoryUrl,
+            projectFiles,
             searchTerm,
           });
     if (!result) return ok([]);
@@ -71,8 +80,15 @@ export function toIssueProviderCapabilities(
   const requiredInputs = plugin.capabilities.issues.requiredInputs;
   return {
     requiresRepositoryUrl: requiredInputs.includes('repositoryUrl'),
+    requiresProjectFiles: requiredInputs.includes('projectFiles'),
+    requiresAccount: integrationRequiresAccount(plugin.metadata.integrationId),
     supportsIssueContext: !!plugin.behavior.issues?.getIssue,
   };
+}
+
+/** Integrations that declare no auth methods (local sources) never hold an account. */
+export function integrationRequiresAccount(integrationId: string): boolean {
+  return (integrationPluginRegistry.get(integrationId)?.capabilities.auth.methods.length ?? 1) > 0;
 }
 
 export function toLinkedIssue(

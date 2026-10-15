@@ -52,10 +52,11 @@ const testDependencies: PluginIssueProviderDependencies = {
 
 function makePlugin(overrides: {
   integrationId?: string;
-  requiredInputs?: 'repositoryUrl'[];
+  requiredInputs?: ('repositoryUrl' | 'projectFiles')[];
   listIssues?: ReturnType<typeof vi.fn>;
   searchIssues?: ReturnType<typeof vi.fn>;
   getIssue?: ReturnType<typeof vi.fn>;
+  isAvailable?: ReturnType<typeof vi.fn>;
 }): IssuesPluginProvider {
   return {
     metadata: { integrationId: overrides.integrationId ?? 'linear' },
@@ -67,6 +68,7 @@ function makePlugin(overrides: {
         listIssues: overrides.listIssues ?? vi.fn(async () => ok([])),
         searchIssues: overrides.searchIssues ?? vi.fn(async () => ok([])),
         ...(overrides.getIssue ? { getIssue: overrides.getIssue } : {}),
+        ...(overrides.isAvailable ? { isAvailable: overrides.isAvailable } : {}),
       },
     },
   } as unknown as IssuesPluginProvider;
@@ -82,6 +84,36 @@ describe('createPluginIssueProvider', () => {
       const credentials = await mockGetCredentials(_provider, accountId);
       return credentials ? { accountId: accountId ?? 'default', credentials } : null;
     });
+  });
+
+  it('serves account-less sources from project files without an account', async () => {
+    const files = { listDirectories: vi.fn(), readText: vi.fn() };
+    const listIssues = vi.fn(async () => ok([{ identifier: 'add-thing', title: 'Add thing' }]));
+    const isAvailable = vi.fn(async () => true);
+    const provider = createPluginIssueProvider(
+      makePlugin({
+        integrationId: 'openspec',
+        requiredInputs: ['projectFiles'],
+        listIssues,
+        isAvailable,
+      }),
+      { ...testDependencies, resolveProjectFiles: () => files }
+    );
+
+    const result = await provider.listIssues({ projectId: 'p1' });
+    expect(result.success && result.data[0]).toMatchObject({ identifier: 'add-thing' });
+    expect(result.success && result.data[0]?.accountId).toBeUndefined();
+    expect(listIssues).toHaveBeenCalledWith(
+      expect.objectContaining({ credentials: {} }),
+      expect.objectContaining({ projectFiles: files })
+    );
+    expect(testDependencies.resolveProjectIntegrationAccount).not.toHaveBeenCalled();
+    expect(mockGetAccount).not.toHaveBeenCalled();
+
+    await expect(provider.isAvailable('p1')).resolves.toBe(true);
+    expect(isAvailable).toHaveBeenCalledWith({ projectFiles: files });
+    await expect(provider.checkConnection()).resolves.toMatchObject({ connected: true });
+    expect(mockCheckConnection).not.toHaveBeenCalled();
   });
 
   it('retains the source account on issues returned by a default-account lookup', async () => {
@@ -222,6 +254,8 @@ describe('createPluginIssueProvider', () => {
     );
     expect(provider.capabilities).toEqual({
       requiresRepositoryUrl: true,
+      requiresProjectFiles: false,
+      requiresAccount: true,
       supportsIssueContext: false,
     });
   });

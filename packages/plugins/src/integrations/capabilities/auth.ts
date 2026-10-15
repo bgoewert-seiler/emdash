@@ -45,7 +45,8 @@ const authMethodSchema = z.discriminatedUnion('kind', [
 
 const authDescriptorSchema = z
   .object({
-    methods: z.array(authMethodSchema).min(1),
+    /** Empty for local sources that need no account; those are never connected or listed. */
+    methods: z.array(authMethodSchema),
     accountLabelRequired: z.boolean().optional(),
   })
   .superRefine(({ methods }, ctx) => {
@@ -108,5 +109,5 @@ export const integrationAuthCapability = definePluginCapability<IIntegrationAuth
   'auth',
   authDescriptorSchema,
   undefined,
-  { requiresBehavior: () => true }
+  { requiresBehavior: ({ methods }) => methods.length > 0 }
 );

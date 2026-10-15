@@ -9,6 +9,7 @@ export {
   type IssuesPluginProvider,
 } from './plugin';
 export type {
+  IssueAvailabilityOpts,
   IssueData,
   IssueDetail,
   IssueError,
@@ -17,5 +18,6 @@ export type {
   IssueListResult,
   IssueQueryOpts,
   IssueSearchOpts,
+  ProjectFilesReader,
 } from './types';
 export type { IIssuesBehavior, IssuesDescriptor } from './capabilities/issues';
