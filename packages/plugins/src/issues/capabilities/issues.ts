@@ -2,6 +2,7 @@ import { definePluginCapability } from '@emdash/shared/plugins';
 import z from 'zod';
 import type { ConnectedIntegrationHostContext } from '../../integrations/host';
 import type {
+  IssueAvailabilityOpts,
   IssueGetOpts,
   IssueGetResult,
   IssueListResult,
@@ -12,9 +13,10 @@ import type {
 /**
  * Host-supplied context an issues plugin needs before it can operate.
  * Repository-scoped services (GitHub, GitLab, Forgejo) need `repositoryUrl`, including its host;
- * account-scoped services (Linear, Jira, ...) need nothing.
+ * account-scoped services (Linear, Jira, ...) need nothing; local sources (OpenSpec) read the
+ * project's own files through `projectFiles`.
  */
-export const issueRequiredInputSchema = z.enum(['repositoryUrl']);
+export const issueRequiredInputSchema = z.enum(['repositoryUrl', 'projectFiles']);
 
 export type IssueRequiredInput = z.infer<typeof issueRequiredInputSchema>;
 
@@ -31,6 +33,8 @@ export type IIssuesBehavior = {
     opts: IssueSearchOpts
   ): Promise<IssueListResult>;
   getIssue?(host: ConnectedIntegrationHostContext, opts: IssueGetOpts): Promise<IssueGetResult>;
+  /** Hides the source for projects it cannot serve; omitted means always available. */
+  isAvailable?(opts: IssueAvailabilityOpts): Promise<boolean>;
 };
 
 export const issuesCapability = definePluginCapability<IIssuesBehavior>()(

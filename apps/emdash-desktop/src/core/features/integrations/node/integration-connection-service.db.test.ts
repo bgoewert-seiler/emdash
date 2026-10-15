@@ -265,6 +265,8 @@ describe('IntegrationConnectionService account identity', () => {
     });
     const checking = service.checkConnection('linear', {
       requiresRepositoryUrl: false,
+      requiresProjectFiles: false,
+      requiresAccount: true,
       supportsIssueContext: true,
     });
     await started.promise;
@@ -288,6 +290,8 @@ describe('IntegrationConnectionService account identity', () => {
     });
     const checking = service.checkConnection('linear', {
       requiresRepositoryUrl: false,
+      requiresProjectFiles: false,
+      requiresAccount: true,
       supportsIssueContext: true,
     });
     await started.promise;
@@ -348,7 +352,12 @@ describe('IntegrationConnectionService account identity', () => {
       (
         await service.checkConnection(
           'linear',
-          { requiresRepositoryUrl: false, supportsIssueContext: true },
+          {
+            requiresRepositoryUrl: false,
+            requiresProjectFiles: false,
+            requiresAccount: true,
+            supportsIssueContext: true,
+          },
           first.accountId
         )
       ).connected
@@ -380,7 +389,12 @@ describe('IntegrationConnectionService account identity', () => {
 
     const status = await service.checkConnection(
       'gitlab',
-      { requiresRepositoryUrl: false, supportsIssueContext: true },
+      {
+        requiresRepositoryUrl: false,
+        requiresProjectFiles: false,
+        requiresAccount: true,
+        supportsIssueContext: true,
+      },
       'https://gitlab.com:42'
     );
 
@@ -400,7 +414,12 @@ describe('IntegrationConnectionService account identity', () => {
     });
     await service.checkConnection(
       'linear',
-      { requiresRepositoryUrl: false, supportsIssueContext: true },
+      {
+        requiresRepositoryUrl: false,
+        requiresProjectFiles: false,
+        requiresAccount: true,
+        supportsIssueContext: true,
+      },
       first.accountId
     );
     expect(

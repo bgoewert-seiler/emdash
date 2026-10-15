@@ -56,6 +56,7 @@ import {
 } from '@core/features/integrations/node/integration-oauth-tokens';
 import { migrateGitHubJsonCredentials } from '@core/features/integrations/node/migrations/github-json-credentials';
 import { LegacyIntegrationAccountsMigration } from '@core/features/integrations/node/migrations/legacy-integration-accounts';
+import { createProjectFilesReader } from '@core/features/issues/node/project-files-reader';
 import { createIssueProviderRegistry } from '@core/features/issues/node/registry';
 import {
   createPromptLibraryService,
@@ -596,7 +597,13 @@ export async function bootServices(
     channels: gitCredentialServer,
     logger: log,
   });
-  const issueProviders = createIssueProviderRegistry({ resolveProjectIntegrationAccount });
+  const issueProviders = createIssueProviderRegistry({
+    resolveProjectIntegrationAccount,
+    resolveProjectFiles: (projectId) => {
+      const attached = projectManager.requireAttached(projectId);
+      return attached.success ? createProjectFilesReader(attached.data.files) : undefined;
+    },
+  });
   const pullRequestsRegistration = new PullRequestsRegistration({
     getClient: getPullRequestsRuntimeClient,
     onResume: (handler) => {

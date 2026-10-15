@@ -171,7 +171,12 @@ beforeEach(() => {
   accountInventory = undefined;
   launched = undefined;
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
-  const capabilities = { requiresRepositoryUrl: false, supportsIssueContext: true };
+  const capabilities = {
+    requiresRepositoryUrl: false,
+    requiresProjectFiles: false,
+    requiresAccount: true,
+    supportsIssueContext: true,
+  };
   queryClient.setQueryData(INTEGRATION_PROVIDERS_QUERY_KEY, [
     {
       ...integration.metadata,

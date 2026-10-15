@@ -24,6 +24,10 @@ export const issuesContract = defineContract({
     input: voidInput,
     output: z.custom<ConnectionStatusMap>(),
   }),
+  listProjectSources: procedure({
+    input: z.object({ projectId: z.string() }),
+    output: z.array(z.custom<IssueProviderType>()),
+  }),
   listIssues: procedure({
     input: z.object({
       provider: z.custom<IssueProviderType>(),

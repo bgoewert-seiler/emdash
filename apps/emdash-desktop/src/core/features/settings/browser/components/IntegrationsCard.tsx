@@ -39,6 +39,8 @@ const IntegrationsCard: React.FC = () => {
 
   const integrations: IntegrationItem[] = integrationMetadata
     .filter(isIssueIntegration)
+    // Account-less sources turn on by themselves in projects that use them.
+    .filter((integration) => integration.issueCapabilities.requiresAccount)
     .map((integration) => {
       const provider = integration.id;
       const status: ConnectionStatus = connectionStatus[provider] ?? {

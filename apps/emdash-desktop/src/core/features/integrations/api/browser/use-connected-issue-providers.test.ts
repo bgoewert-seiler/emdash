@@ -1,10 +1,18 @@
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { JSDOM } from 'jsdom';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { useConnectedIssueProviders } from './use-connected-issue-providers';
 
-const mocks = vi.hoisted(() => ({ context: vi.fn(), settings: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  context: vi.fn(),
+  settings: vi.fn(),
+  listProjectSources: vi.fn(),
+}));
+vi.mock('@core/features/issues/api/browser/client', () => ({
+  getIssuesClient: async () => ({ listProjectSources: mocks.listProjectSources }),
+}));
 vi.mock('@core/features/integrations/contributions/browser/integrations-provider', () => ({
   useIntegrationsContext: mocks.context,
 }));
@@ -16,6 +24,14 @@ afterEach(() => {
   vi.unstubAllGlobals();
   vi.clearAllMocks();
 });
+
+function withQueryClient(Probe: () => React.ReactNode) {
+  return React.createElement(
+    QueryClientProvider,
+    { client: new QueryClient({ defaultOptions: { queries: { retry: false } } }) },
+    React.createElement(Probe)
+  );
+}
 
 describe('project issue provider availability', () => {
   it.each([
@@ -33,8 +49,16 @@ describe('project issue provider availability', () => {
   ])('uses repository-compatible accounts: %s', async (_case, accounts, expected) => {
     mocks.context.mockReturnValue({
       integrations: [
-        { id: 'github', features: ['issues'], issueCapabilities: { requiresRepositoryUrl: true } },
-        { id: 'gitlab', features: ['issues'], issueCapabilities: { requiresRepositoryUrl: true } },
+        {
+          id: 'github',
+          features: ['issues'],
+          issueCapabilities: { requiresAccount: true, requiresRepositoryUrl: true },
+        },
+        {
+          id: 'gitlab',
+          features: ['issues'],
+          issueCapabilities: { requiresAccount: true, requiresRepositoryUrl: true },
+        },
       ],
       integrationAccounts: accounts,
       isLoadingAccounts: false,
@@ -57,7 +81,7 @@ describe('project issue provider availability', () => {
       return React.createElement('span', {}, result.connectedProviders.join(','));
     }
     try {
-      await act(async () => root.render(React.createElement(Probe)));
+      await act(async () => root.render(withQueryClient(Probe)));
       expect(container.textContent).toBe(expected.join(','));
     } finally {
       await act(async () => root.unmount());
@@ -73,7 +97,7 @@ describe('project issue provider availability', () => {
           {
             id: 'linear',
             features: ['issues'],
-            issueCapabilities: { requiresRepositoryUrl: false },
+            issueCapabilities: { requiresRepositoryUrl: false, requiresAccount: true },
           },
         ],
         integrationAccounts: configured ? { linear: [{ accountId: 'a' }] } : {},
@@ -96,7 +120,7 @@ describe('project issue provider availability', () => {
         return null;
       }
       try {
-        await act(async () => root.render(React.createElement(Probe)));
+        await act(async () => root.render(withQueryClient(Probe)));
         expect(result?.connectedProviders).toEqual([]);
         expect(result?.isProviderUsable('linear')).toBe(false);
         expect(result?.hasAnyIssueIntegration).toBe(false);
@@ -125,7 +149,7 @@ describe('project issue provider availability', () => {
       return React.createElement('span', {}, result.error);
     }
     try {
-      await act(async () => root.render(React.createElement(Probe)));
+      await act(async () => root.render(withQueryClient(Probe)));
       expect(container.textContent).toBe('Accounts could not be loaded');
     } finally {
       await act(async () => root.unmount());
@@ -141,7 +165,7 @@ describe('project issue provider availability', () => {
           {
             id: 'linear',
             features: ['issues'],
-            issueCapabilities: { requiresRepositoryUrl: false },
+            issueCapabilities: { requiresRepositoryUrl: false, requiresAccount: true },
           },
         ],
         integrationAccounts: configured ? { linear: [{ accountId: 'a' }, { accountId: 'b' }] } : {},
@@ -164,8 +188,46 @@ describe('project issue provider availability', () => {
         return React.createElement('span', {}, result.connectedProviders.join(','));
       }
       try {
-        await act(async () => root.render(React.createElement(Probe)));
+        await act(async () => root.render(withQueryClient(Probe)));
         expect(container.textContent).toBe('linear');
+      } finally {
+        await act(async () => root.unmount());
+        dom.window.close();
+      }
+    }
+  );
+
+  it.each([true, false])(
+    'offers an account-less source only where the project has it (available=%s)',
+    async (available) => {
+      mocks.context.mockReturnValue({
+        integrations: [
+          {
+            id: 'openspec',
+            features: ['issues'],
+            issueCapabilities: { requiresProjectFiles: true, requiresAccount: false },
+          },
+        ],
+        integrationAccounts: {},
+        isLoadingAccounts: false,
+      });
+      mocks.settings.mockReturnValue(undefined);
+      mocks.listProjectSources.mockResolvedValue(available ? ['openspec'] : []);
+      const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>');
+      vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+      vi.stubGlobal('window', dom.window);
+      vi.stubGlobal('document', dom.window.document);
+      const container = dom.window.document.getElementById('root')!;
+      const root = createRoot(container);
+      function Probe() {
+        const result = useConnectedIssueProviders({ projectId: 'project' });
+        return React.createElement('span', {}, result.connectedProviders.join(','));
+      }
+      try {
+        await act(async () => root.render(withQueryClient(Probe)));
+        await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+        expect(container.textContent).toBe(available ? 'openspec' : '');
+        expect(mocks.listProjectSources).toHaveBeenCalledWith({ projectId: 'project' });
       } finally {
         await act(async () => root.unmount());
         dom.window.close();

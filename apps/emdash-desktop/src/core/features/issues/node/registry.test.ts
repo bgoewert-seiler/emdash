@@ -330,6 +330,8 @@ describe('repository issue accounts through the shared registry', () => {
       expect(await provider(providerId).checkConnection()).toBe(status);
       expect(mocks.checkConnection).toHaveBeenCalledWith(providerId, {
         requiresRepositoryUrl: true,
+        requiresProjectFiles: false,
+        requiresAccount: true,
         supportsIssueContext: false,
       });
     });

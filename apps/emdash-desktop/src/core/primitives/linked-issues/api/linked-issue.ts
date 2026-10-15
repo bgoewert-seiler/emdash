@@ -19,6 +19,7 @@ export const issueProviderIdSchema = z.enum([
   'notion',
   'trello',
   'youtrack',
+  'openspec',
 ]);
 
 const v0Schema = z.object({
