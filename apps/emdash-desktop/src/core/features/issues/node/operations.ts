@@ -14,6 +14,8 @@ import type {
   IssueProjectUnavailableError,
   IssueProviderType,
 } from '@core/primitives/issue-providers/api';
+import type { ProjectIssueScopes } from '../api/contract';
+import { JIRA_TOML_FILE, readJiraTomlScope } from './jira-toml-scope';
 import type { IssueProviderRegistry } from './registry';
 
 const DEFAULT_CAPABILITIES = {
@@ -183,4 +185,15 @@ export async function getIssueContext(
     ? await withResolvedRemote(dependencies, opts)
     : ok(opts);
   return resolved.success ? issueProvider.getIssueContext(resolved.data) : resolved;
+}
+
+/** Read fresh on every call so the settings page tracks edits to the files. */
+export async function getProjectIssueScopes(
+  dependencies: IssueOperationsDependencies,
+  projectId: string
+): Promise<ProjectIssueScopes> {
+  const attached = dependencies.projects.requireAttached(projectId);
+  if (!attached.success) return {};
+  const jira = await readJiraTomlScope(attached.data.files).catch(() => undefined);
+  return jira ? { jira: { query: jira, source: JIRA_TOML_FILE } } : {};
 }

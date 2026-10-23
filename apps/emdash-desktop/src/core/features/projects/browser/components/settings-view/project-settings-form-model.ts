@@ -49,8 +49,11 @@ export type EnvironmentFormState = {
  */
 export type IntegrationAccountsFormState = Partial<Record<string, StoredIntegrationAccount | null>>;
 
-/** Per-provider issue filter text; blank clears the stored filter on save. */
-export type IssueFiltersFormState = Partial<Record<string, string>>;
+/**
+ * Per-provider issue filter text. `null` (or blank) clears the stored filter on save, so the
+ * provider falls back to any scope the repository declares; absent means untouched.
+ */
+export type IssueFiltersFormState = Partial<Record<string, string | null>>;
 
 export type GitIdentityFormState = {
   defaultBranch: GitBranchRef | null;

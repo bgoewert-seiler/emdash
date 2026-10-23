@@ -13,6 +13,10 @@ import type {
 
 const voidInput = z.void();
 
+export type ProjectIssueScope = { query: string; source: string };
+/** Keyed by integration id. */
+export type ProjectIssueScopes = Partial<Record<string, ProjectIssueScope>>;
+
 export const issuesDomain = 'issues' as const;
 
 export const issuesContract = defineContract({
@@ -37,6 +41,11 @@ export const issuesContract = defineContract({
       options: z.custom<IssueSearchOpts>(),
     }),
     output: z.custom<IssueListResult>(),
+  }),
+  /** Issue scopes a project declares in its own files, keyed by provider (jira: .jira.toml). */
+  getProjectIssueScopes: procedure({
+    input: z.object({ projectId: z.string() }),
+    output: z.custom<ProjectIssueScopes>(),
   }),
   getIssueContext: procedure({
     input: z.object({

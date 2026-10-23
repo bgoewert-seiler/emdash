@@ -9,6 +9,7 @@ const state = vi.hoisted(() => ({
   accounts: undefined as ProviderAccountsByProvider | undefined,
   openModal: vi.fn(),
 }));
+vi.mock('@tanstack/react-query', () => ({ useQuery: () => ({ data: undefined }) }));
 vi.mock('@core/features/integrations/api/browser/use-provider-accounts', () => ({
   useAccounts: () => ({ data: state.accounts, isError: false }),
 }));
@@ -69,6 +70,7 @@ describe('project integration account rows', () => {
         <IntegrationAccountsSection
           integrationAccountsForm={{}}
           updateIntegrationAccounts={update}
+          projectId="project-1"
           issueFiltersForm={{}}
           updateIssueFilters={vi.fn()}
           repositoryHost={null}
@@ -104,6 +106,7 @@ describe('project integration account rows', () => {
         <IntegrationAccountsSection
           integrationAccountsForm={{ jira: { kind: 'account', accountId: 'jira:a' } }}
           updateIntegrationAccounts={vi.fn()}
+          projectId="project-1"
           issueFiltersForm={{}}
           updateIssueFilters={vi.fn()}
           repositoryHost={null}
@@ -146,6 +149,7 @@ describe('project integration account rows', () => {
           <IntegrationAccountsSection
             integrationAccountsForm={form}
             updateIntegrationAccounts={vi.fn()}
+            projectId="project-1"
             issueFiltersForm={{}}
             updateIssueFilters={vi.fn()}
             repositoryHost="code.example"
@@ -178,6 +182,7 @@ describe('project integration account rows', () => {
         <IntegrationAccountsSection
           integrationAccountsForm={form}
           updateIntegrationAccounts={update}
+          projectId="project-1"
           issueFiltersForm={{}}
           updateIssueFilters={vi.fn()}
           repositoryHost="github.com"

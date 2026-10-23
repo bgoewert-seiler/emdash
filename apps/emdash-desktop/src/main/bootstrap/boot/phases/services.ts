@@ -56,6 +56,7 @@ import {
 } from '@core/features/integrations/node/integration-oauth-tokens';
 import { migrateGitHubJsonCredentials } from '@core/features/integrations/node/migrations/github-json-credentials';
 import { LegacyIntegrationAccountsMigration } from '@core/features/integrations/node/migrations/legacy-integration-accounts';
+import { readJiraTomlScope } from '@core/features/issues/node/jira-toml-scope';
 import { createIssueProviderRegistry } from '@core/features/issues/node/registry';
 import {
   createPromptLibraryService,
@@ -599,8 +600,15 @@ export async function bootServices(
   });
   const issueProviders = createIssueProviderRegistry({
     resolveProjectIntegrationAccount,
-    getProjectIssueFilter: async (projectId, provider) =>
-      (await loadStoredIssueFilters(db, projectId))[provider],
+    // A filter saved in project settings overrides the repository's .jira.toml scope.
+    getProjectIssueFilter: async (projectId, provider) => {
+      const stored = (await loadStoredIssueFilters(db, projectId))[provider];
+      if (stored || provider !== 'jira') return stored;
+      const attached = projectManager.requireAttached(projectId);
+      return attached.success
+        ? await readJiraTomlScope(attached.data.files).catch(() => undefined)
+        : undefined;
+    },
   });
   const pullRequestsRegistration = new PullRequestsRegistration({
     getClient: getPullRequestsRuntimeClient,

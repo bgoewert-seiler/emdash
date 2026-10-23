@@ -1,12 +1,15 @@
 import { Field, Input, Select, Separator } from '@emdash/ui/react/primitives';
+import { useQuery } from '@tanstack/react-query';
 import { Plus } from 'lucide-react';
 import { observer } from 'mobx-react-lite';
 import type { ReactNode } from 'react';
 import { useAccounts } from '@core/features/integrations/api/browser/use-provider-accounts';
 import { IntegrationIcon } from '@core/features/integrations/contributions/browser/integration-icon';
 import { useIntegrationsContext } from '@core/features/integrations/contributions/browser/integrations-provider';
+import { getIssuesClient } from '@core/features/issues/api/browser/client';
 import {
   ProvenanceBadge,
+  ProvenanceSourceLine,
   ResetProvenanceButton,
 } from '@core/features/projects/contributions/browser/settings-provenance';
 import { useOpenModal } from '@core/manifests/browser/modal-api';
@@ -34,12 +37,14 @@ const CONNECT_OPTION = '__connect_provider_account__';
 
 /** One account-selection row per integration, using the same host policy as issue execution. */
 export const IntegrationAccountsSection = observer(function IntegrationAccountsSection({
+  projectId,
   integrationAccountsForm,
   updateIntegrationAccounts,
   issueFiltersForm,
   updateIssueFilters,
   repositoryHost,
 }: {
+  projectId: string;
   integrationAccountsForm: IntegrationAccountsFormState;
   updateIntegrationAccounts: FormUpdate<IntegrationAccountsFormState>;
   issueFiltersForm: IssueFiltersFormState;
@@ -51,6 +56,11 @@ export const IntegrationAccountsSection = observer(function IntegrationAccountsS
   const accountsQuery = useAccounts();
   const integrationAccounts = accountsQuery.data;
   const openIntegrationSetup = useOpenModal('integrationSetupModal');
+  // Refetched whenever the page mounts, so edits to a scope file show without a restart.
+  const projectScopes = useQuery({
+    queryKey: ['issues:project-scopes', projectId],
+    queryFn: async () => (await getIssuesClient()).getProjectIssueScopes({ projectId }),
+  }).data;
 
   const integrationRows = integrations
     .map((integration) => {
@@ -97,7 +107,8 @@ export const IntegrationAccountsSection = observer(function IntegrationAccountsS
                 integration.issueCapabilities.issueFilter
                   ? {
                       ...integration.issueCapabilities.issueFilter,
-                      value: issueFiltersForm[integration.id] ?? '',
+                      value: issueFiltersForm[integration.id],
+                      inherited: projectScopes?.[integration.id],
                       onChange: (value) => updateIssueFilters(integration.id, value),
                     }
                   : undefined
@@ -143,8 +154,11 @@ const ProviderAccountRow = observer(function ProviderAccountRow({
   filter?: {
     label: string;
     placeholder?: string;
-    value: string;
-    onChange: (value: string) => void;
+    /** A string is this project's own filter; null or absent follows `inherited`. */
+    value: string | null | undefined;
+    /** Scope the repository declares in a file, used when no filter is set. */
+    inherited?: { query: string; source: string };
+    onChange: (value: string | null) => void;
   };
 }) {
   const unresolvable = resolution?.provenance.kind === 'unresolvable';
@@ -233,13 +247,34 @@ const ProviderAccountRow = observer(function ProviderAccountRow({
       ) : null}
       {filter ? (
         <div className="flex min-h-9 items-center justify-between gap-4 pb-2">
-          <span className="text-xs text-foreground-muted">{filter.label}</span>
+          <div className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-1">
+            <span className="text-xs text-foreground-muted">{filter.label}</span>
+            {filter.inherited ? (
+              typeof filter.value === 'string' ? (
+                <>
+                  <ProvenanceBadge provenance={{ kind: 'set' }} />
+                  <ResetProvenanceButton onReset={() => filter.onChange(null)} />
+                </>
+              ) : (
+                <>
+                  <ProvenanceBadge
+                    provenance={{ kind: 'inferred', from: filter.inherited.source }}
+                  />
+                  <ProvenanceSourceLine
+                    provenance={{ kind: 'inferred', from: filter.inherited.source }}
+                  />
+                </>
+              )
+            ) : null}
+          </div>
           <Input
             aria-label={`${name} ${filter.label}`}
             className="min-w-0 shrink-0"
             style={{ width: '18rem', maxWidth: '65%' }}
             placeholder={filter.placeholder}
-            value={filter.value}
+            value={
+              typeof filter.value === 'string' ? filter.value : (filter.inherited?.query ?? '')
+            }
             onChange={(event) => filter.onChange(event.target.value)}
           />
         </div>
