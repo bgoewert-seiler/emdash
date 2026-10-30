@@ -1,6 +1,6 @@
 import { parseRepositoryRef } from '@emdash/core/primitives/repository/api';
 import type { IntegrationCredentials } from '@emdash/plugins/integrations';
-import type { IssuesPluginProvider } from '@emdash/plugins/issues';
+import type { IssuesPluginProvider, ProjectFilesReader } from '@emdash/plugins/issues';
 import { err, ok, type Result } from '@emdash/shared';
 import { log } from '@emdash/shared/logger';
 import type {
@@ -34,6 +34,7 @@ export type PluginIssueProviderDependencies = {
   resolveProjectIntegrationAccount: ProjectIntegrationAccountResolver;
   /** The project's stored issue filter for a provider, if any. */
   getProjectIssueFilter?: (projectId: string, provider: string) => Promise<string | undefined>;
+  resolveProjectFiles?: (projectId: string) => ProjectFilesReader | undefined;
 };
 
 export function createPluginIssueProvider(
@@ -46,7 +47,7 @@ export function createPluginIssueProvider(
 
   type ConnectedAccount = {
     credentials: IntegrationCredentials;
-    accountId: string;
+    accountId?: string;
   };
 
   /**
@@ -60,6 +61,7 @@ export function createPluginIssueProvider(
     opts: IssueQueryOpts,
     sourceAccountId?: string
   ): Promise<Result<ConnectedAccount, IssueListError>> {
+    if (!capabilities.requiresAccount) return ok({ credentials: {} });
     const url = repositoryUrl(opts);
     if (capabilities.requiresRepositoryUrl && !url) {
       return err({
@@ -139,6 +141,11 @@ export function createPluginIssueProvider(
     return value || undefined;
   }
 
+  function projectFiles(opts: IssueQueryOpts): ProjectFilesReader | undefined {
+    if (!capabilities.requiresProjectFiles || !opts.projectId) return undefined;
+    return dependencies.resolveProjectFiles?.(opts.projectId);
+  }
+
   function notConnectedError(): Result<never, IssueListError> {
     return err({ type: 'auth_required', message: `${provider} is not connected.` });
   }
@@ -147,8 +154,21 @@ export function createPluginIssueProvider(
     type: provider,
     capabilities,
 
-    checkConnection: () =>
-      getIntegrationConnectionService().checkConnection(provider, capabilities),
+    checkConnection: async () =>
+      capabilities.requiresAccount
+        ? getIntegrationConnectionService().checkConnection(provider, capabilities)
+        : { connected: true, capabilities },
+
+    isAvailable: async (projectId) => {
+      const isAvailable = plugin.behavior.issues?.isAvailable;
+      if (!isAvailable) return true;
+      try {
+        return await isAvailable({ projectFiles: projectFiles({ projectId }) });
+      } catch (error) {
+        pluginLog.warn('Issue source availability check failed', { error });
+        return false;
+      }
+    },
 
     ...createIssueListOperations(plugin, async (opts) => {
       const account = await getConnectedAccount(opts);
@@ -160,6 +180,7 @@ export function createPluginIssueProvider(
         host: { log: pluginLog, credentials: account.data.credentials },
         accountId: account.data.accountId,
         repositoryUrl: repositoryUrl(opts),
+        projectFiles: projectFiles(opts),
         ...(issueFilter ? { issueFilter } : {}),
       });
     }),
@@ -179,6 +200,7 @@ export function createPluginIssueProvider(
             {
               identifier: term,
               repositoryUrl: repositoryUrl(opts),
+              projectFiles: projectFiles(opts),
             }
           );
           if (!result) {

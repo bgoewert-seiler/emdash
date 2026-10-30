@@ -19,7 +19,8 @@ import { JIRA_TOML_FILE, readJiraTomlScope } from './jira-toml-scope';
 import type { IssueProviderRegistry } from './registry';
 
 const DEFAULT_CAPABILITIES = {
-  requiresProjectPath: false,
+  requiresProjectFiles: false,
+  requiresAccount: true,
   requiresRepositoryUrl: false,
   supportsIssueContext: false,
 } as const;
@@ -133,6 +134,18 @@ export async function checkAllConnections(
   );
 
   return Object.fromEntries(settled) as ConnectionStatusMap;
+}
+
+/** Account-less sources (OpenSpec) that apply to this project, in registry order. */
+export async function listProjectSources(
+  dependencies: IssueOperationsDependencies,
+  projectId: string
+): Promise<IssueProviderType[]> {
+  const local = dependencies.providers
+    .getAll()
+    .filter((provider) => !provider.capabilities.requiresAccount);
+  const available = await Promise.all(local.map((provider) => provider.isAvailable(projectId)));
+  return local.filter((_, index) => available[index]).map((provider) => provider.type);
 }
 
 export async function listIssues(

@@ -6,6 +6,7 @@ import {
   getIssueContext,
   getProjectIssueScopes,
   listIssues,
+  listProjectSources,
   searchIssues,
 } from './operations';
 import type { IssueOperationsDependencies } from './operations';
@@ -14,6 +15,7 @@ export function createIssuesWireController(dependencies: IssueOperationsDependen
   return createController(issuesContract, {
     checkConnection: ({ provider }) => checkConnection(dependencies, provider),
     checkAllConnections: () => checkAllConnections(dependencies),
+    listProjectSources: ({ projectId }) => listProjectSources(dependencies, projectId),
     listIssues: ({ provider, options }) => listIssues(dependencies, provider, options),
     searchIssues: ({ provider, options }) => searchIssues(dependencies, provider, options),
     getProjectIssueScopes: ({ projectId }) => getProjectIssueScopes(dependencies, projectId),

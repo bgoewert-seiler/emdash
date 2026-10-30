@@ -57,6 +57,7 @@ import {
 import { migrateGitHubJsonCredentials } from '@core/features/integrations/node/migrations/github-json-credentials';
 import { LegacyIntegrationAccountsMigration } from '@core/features/integrations/node/migrations/legacy-integration-accounts';
 import { readJiraTomlScope } from '@core/features/issues/node/jira-toml-scope';
+import { createProjectFilesReader } from '@core/features/issues/node/project-files-reader';
 import { createIssueProviderRegistry } from '@core/features/issues/node/registry';
 import {
   createPromptLibraryService,
@@ -608,6 +609,10 @@ export async function bootServices(
       return attached.success
         ? await readJiraTomlScope(attached.data.files).catch(() => undefined)
         : undefined;
+    },
+    resolveProjectFiles: (projectId) => {
+      const attached = projectManager.requireAttached(projectId);
+      return attached.success ? createProjectFilesReader(attached.data.files) : undefined;
     },
   });
   const pullRequestsRegistration = new PullRequestsRegistration({

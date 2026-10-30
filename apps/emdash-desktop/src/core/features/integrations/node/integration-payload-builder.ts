@@ -3,6 +3,7 @@ import {
   type IntegrationAuthDescriptor,
 } from '@emdash/plugins/integrations';
 import { issuesPluginRegistry } from '@emdash/plugins/issues';
+import { integrationRequiresAccount } from '@core/features/issues/api/node/plugin-issue-adapter';
 import type { IssueProviderCapabilities } from '@core/primitives/issue-providers/api';
 import type { IntegrationProviderDescriptor } from '../api/contract';
 
@@ -12,6 +13,8 @@ function issueCapabilities(integrationId: string): IssueProviderCapabilities {
   const issueFilter = plugin?.capabilities.issues.issueFilter;
   return {
     requiresRepositoryUrl: requiredInputs.includes('repositoryUrl'),
+    requiresProjectFiles: requiredInputs.includes('projectFiles'),
+    requiresAccount: integrationRequiresAccount(integrationId),
     supportsIssueContext: !!plugin?.behavior.issues?.getIssue,
     ...(issueFilter ? { issueFilter } : {}),
   };

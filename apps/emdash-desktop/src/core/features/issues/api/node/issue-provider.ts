@@ -23,4 +23,6 @@ export interface IssueProvider {
   listIssues(opts: IssueQueryOpts): Promise<IssueListResult>;
   searchIssues(opts: IssueSearchOpts): Promise<IssueListResult>;
   getIssueContext?(opts: IssueContextOpts): Promise<IssueContextResult>;
+  /** Whether the source applies to this project; account-backed providers always do. */
+  isAvailable(projectId: string): Promise<boolean>;
 }

@@ -1,15 +1,21 @@
 import { err, ok } from '@emdash/shared';
 import { describe, expect, it, vi } from 'vitest';
 import type { IssueProvider } from '@core/features/issues/api/node/issue-provider';
-import { getIssueContext, listIssues } from './operations';
+import { getIssueContext, listIssues, listProjectSources } from './operations';
 
 function provider(): IssueProvider {
   return {
     type: 'github',
-    capabilities: { requiresRepositoryUrl: true, supportsIssueContext: true },
+    capabilities: {
+      requiresRepositoryUrl: true,
+      requiresProjectFiles: false,
+      requiresAccount: true,
+      supportsIssueContext: true,
+    },
     checkConnection: vi.fn(),
     listIssues: vi.fn(async () => ok([])),
     searchIssues: vi.fn(async () => ok([])),
+    isAvailable: vi.fn(async () => true),
   };
 }
 
@@ -18,7 +24,12 @@ describe('issue project availability', () => {
     const issueProvider = {
       ...provider(),
       type: 'linear' as const,
-      capabilities: { requiresRepositoryUrl: false, supportsIssueContext: true },
+      capabilities: {
+        requiresRepositoryUrl: false,
+        requiresProjectFiles: false,
+        requiresAccount: true,
+        supportsIssueContext: true,
+      },
       getIssueContext: vi.fn(async () =>
         ok({
           provider: 'linear' as const,
@@ -102,5 +113,29 @@ describe('issue project availability', () => {
 
     expect(issueProvider.listIssues).toHaveBeenCalledWith(options);
     expect(requireAttached).not.toHaveBeenCalled();
+  });
+});
+
+describe('listProjectSources', () => {
+  it('returns only account-less sources that apply to the project', async () => {
+    const accountless = (type: 'openspec' | 'trello', available: boolean): IssueProvider => ({
+      ...provider(),
+      type,
+      capabilities: { ...provider().capabilities, requiresAccount: false },
+      isAvailable: vi.fn(async () => available),
+    });
+    const github = provider();
+    const providers = [github, accountless('openspec', true), accountless('trello', false)];
+
+    await expect(
+      listProjectSources(
+        {
+          projects: { requireAttached: vi.fn() } as never,
+          providers: { get: () => undefined, getAll: () => providers },
+        },
+        'p1'
+      )
+    ).resolves.toEqual(['openspec']);
+    expect(github.isAvailable).not.toHaveBeenCalled();
   });
 });

@@ -26,9 +26,11 @@ const credentialsByProvider: Record<string, IntegrationCredentials> = {
 
 describe('integration credential contracts', () => {
   it('covers every registered provider', () => {
-    expect(integrationPluginRegistry.ids().sort()).toEqual(
-      Object.keys(credentialsByProvider).sort()
-    );
+    const accountProviders = integrationPluginRegistry
+      .getAll()
+      .filter((plugin) => plugin.capabilities.auth.methods.length > 0)
+      .map((plugin) => plugin.metadata.id);
+    expect(accountProviders.sort()).toEqual(Object.keys(credentialsByProvider).sort());
   });
 
   it.each(Object.entries(credentialsByProvider))(
