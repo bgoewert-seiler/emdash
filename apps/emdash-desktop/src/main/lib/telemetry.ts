@@ -348,10 +348,10 @@ class DesktopTelemetryService implements Disposable, TelemetryServicePort {
     const config = getAppConfig();
     this.appVersion = options?.appVersion ?? 'unknown';
     this.isPackaged = options?.isPackaged ?? false;
-    this.enabled = !isViteDevBuild && config.telemetryEnabled;
-    // build value wins (prod); dev fallback used locally without VITE_ vars set
-    this.apiKey = appEnv.build.VITE_POSTHOG_KEY ?? appEnv.dev.POSTHOG_PROJECT_API_KEY;
-    this.host = this.normalizeHost(appEnv.build.VITE_POSTHOG_HOST ?? appEnv.dev.POSTHOG_HOST);
+    // Seiler fork build: telemetry stays off whatever the build or dev environment provides.
+    this.enabled = false;
+    this.apiKey = undefined;
+    this.host = undefined;
     this.installSource = config.installSource ?? options?.installSource;
     this.sessionId = randomUUID();
 
