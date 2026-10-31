@@ -125,7 +125,6 @@ describe('project integration account rows', () => {
         <IntegrationAccountsSection
           integrationAccountsForm={{}}
           updateIntegrationAccounts={vi.fn()}
-          projectId="project-1"
           issueFiltersForm={{ jira: 'project = WEB' }}
           updateIssueFilters={updateFilters}
           repositoryHost={null}
@@ -160,7 +159,6 @@ describe('project integration account rows', () => {
         <IntegrationAccountsSection
           integrationAccountsForm={{}}
           updateIntegrationAccounts={vi.fn()}
-          projectId="project-1"
           issueFiltersForm={{}}
           updateIssueFilters={vi.fn()}
           repositoryHost={null}
