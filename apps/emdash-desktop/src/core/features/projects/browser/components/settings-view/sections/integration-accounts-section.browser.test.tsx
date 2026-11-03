@@ -123,6 +123,7 @@ describe('project integration account rows', () => {
     await act(async () =>
       root.render(
         <IntegrationAccountsSection
+          projectId="project-1"
           integrationAccountsForm={{}}
           updateIntegrationAccounts={vi.fn()}
           issueFiltersForm={{ jira: 'project = WEB' }}
@@ -157,6 +158,7 @@ describe('project integration account rows', () => {
     await act(async () =>
       root.render(
         <IntegrationAccountsSection
+          projectId="project-1"
           integrationAccountsForm={{}}
           updateIntegrationAccounts={vi.fn()}
           issueFiltersForm={{}}
