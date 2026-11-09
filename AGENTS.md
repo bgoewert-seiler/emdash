@@ -417,3 +417,35 @@ pnpm run test
 - [Updater risk notes](agents/risky-areas/updater.md)
 - [Contributing guide](CONTRIBUTING.md)
 - [Project README](README.md)
+
+## Project Context
+
+This is the Seiler Instrument fork. `main` tracks upstream `generalaction/emdash`; `seiler/build` carries our additions and receives upstream releases by merge. Fork-only notes live in this section to keep upstream merges clean.
+
+### Fork builds
+
+Builds are local and unsigned. Upstream's Azure Trusted Signing profile belongs to General Action, so the build script strips it, and Windows will show a SmartScreen warning. Never dispatch the `release-*.yml` workflows from this fork.
+
+The build script is `.local/scripts/2026-10-23-build-fork.ts` (untracked). Run it from `apps/emdash-desktop` after `pnpm run build` at the repo root:
+
+```bash
+node --experimental-strip-types ../../.local/scripts/2026-10-23-build-fork.ts --platform win
+node --experimental-strip-types ../../.local/scripts/2026-10-23-build-fork.ts --platform linux --targets deb
+```
+
+Artifacts land in `.local/builds/YYYY-MM-DD-emdash-<version>-<arch>.<ext>`.
+
+### Versioning
+
+Fork builds are versioned `<upstream>+seiler.<N>`, for example `1.2.11+seiler.6`. `N` is a counter that never resets on an upstream bump, so it tracks our changes independent of the upstream base. The script picks one past the highest `N` in `.local/builds`; `--version` overrides it.
+
+Semver ignores `+metadata` when comparing, so electron-updater sees every `+seiler.N` of one upstream version as equal.
+
+### Windows build quirks
+
+Build in a Windows clone, not the WSL checkout: native modules rebuild against the Windows toolchain, and pnpm is unreliable on a `\wsl.localhost` path.
+
+- Clone under `%USERPROFILE%\tmp`, not `C:\tmp`. electron-builder denylists `/tmp`, which resolves to `C:\tmp` on Windows and fails the asar symlink check.
+- Use Node 24.14.0 first on `PATH`; the default Node 26 breaks `electron-rebuild`.
+- Unset `NoDefaultCurrentDirectoryInExePath`, or winpty's `GetCommitHash.bat` is not found and node-pty fails to build.
+- A space in the pnpm install path breaks `apps/emdash-desktop/scripts/postinstall.ts`. Install with `--ignore-scripts` and run `pnpm deploy` with `--ignore-scripts` in the build script copy.
