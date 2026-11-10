@@ -18,6 +18,7 @@ import { toIssueData } from './mapper';
 
 const SEARCH_FIELDS = ['summary', 'description', 'updated', 'project', 'status', 'assignee'];
 const JIRA_KEY_PATTERN = /^[A-Za-z][A-Za-z0-9_]*-\d+$/;
+const EPIC_LINK_CLAUSE = /"Epic Link"\s*=\s*([A-Za-z][A-Za-z0-9_]*-\d+)/g;
 const RECENT_CLAUSE = 'updated >= -90d';
 // Resolved work is not something to start a task from; this holds even under a user's own filter.
 const NOT_DONE_CLAUSE = 'statusCategory != Done';
@@ -39,7 +40,7 @@ export async function listIssues(
     const issues = await searchJql(
       client,
       parsedCredentials.data,
-      listJql(filters.data),
+      listJql(await withEpicSubtasks(client, parsedCredentials.data, filters.data)),
       sanitizedLimit
     );
     return ok(issues.map((issue) => toIssueData(issue, parsedCredentials.data.siteUrl)));
@@ -68,7 +69,8 @@ export async function searchIssues(
     const termClause = JIRA_KEY_PATTERN.test(term)
       ? `(key = "${escapedTerm}" OR text ~ "${escapedTerm}")`
       : `text ~ "${escapedTerm}"`;
-    const jql = scopedJql([...filters.data, termClause]);
+    const scope = await withEpicSubtasks(client, parsedCredentials.data, filters.data);
+    const jql = scopedJql([...scope, termClause]);
     const issues = await searchJql(
       client,
       parsedCredentials.data,
@@ -115,13 +117,49 @@ function scopedJql(clauses: string[]): string {
   return `${where} ORDER BY updated DESC`;
 }
 
+/**
+ * Sub-tasks link to their parent story, not the epic, so `"Epic Link" = X` never returns them.
+ * JQL has no children-of-children operator outside ScriptRunner, so each epic's children are
+ * looked up and their sub-tasks added by `parent in (...)`.
+ */
+async function withEpicSubtasks(
+  client: JiraClient,
+  credentials: JiraCredentials,
+  filters: string[]
+): Promise<string[]> {
+  const epics = new Set<string>();
+  for (const filter of filters) {
+    for (const match of filter.matchAll(EPIC_LINK_CLAUSE)) epics.add(match[1].toUpperCase());
+  }
+  if (epics.size === 0) return filters;
+
+  const childKeys = new Map<string, string[]>();
+  await Promise.all(
+    [...epics].map(async (epic) => {
+      const children = await searchJql(client, credentials, `"Epic Link" = ${epic}`, 500, ['key']);
+      childKeys.set(
+        epic,
+        children.map((child) => child.key)
+      );
+    })
+  );
+
+  return filters.map((filter) =>
+    filter.replace(EPIC_LINK_CLAUSE, (clause, epic: string) => {
+      const keys = childKeys.get(epic.toUpperCase());
+      return keys && keys.length > 0 ? `(${clause} OR parent in (${keys.join(', ')}))` : clause;
+    })
+  );
+}
+
 async function searchJql(
   client: JiraClient,
   credentials: JiraCredentials,
   jql: string,
-  limit: number
+  limit: number,
+  fields: string[] = SEARCH_FIELDS
 ): Promise<JiraIssue[]> {
-  const params = { jql, maxResults: limit, fields: SEARCH_FIELDS };
+  const params = { jql, maxResults: limit, fields };
   // Data Center has no enhanced search; createJiraClient pairs 'pat' with a v2 client.
   const response =
     credentials.authMethod === 'pat'
