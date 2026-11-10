@@ -182,6 +182,32 @@ describe('jira issues plugin', () => {
     });
   });
 
+  it("adds the sub-tasks of an epic's children to an epic filter", async () => {
+    mockSearchForIssues
+      .mockResolvedValueOnce({ issues: [jiraIssue('WEB-995'), jiraIssue('WEB-996')] })
+      .mockResolvedValueOnce({ issues: [] });
+
+    await issues.listIssues(makeHost(), {
+      limit: 10,
+      issueFilter: '("Epic Link" = WEB-994 OR key = WEB-994)',
+    });
+
+    expect(searchParams(0)).toMatchObject({ jql: '"Epic Link" = WEB-994' });
+    expect(searchParams(1)).toMatchObject({
+      jql: '((("Epic Link" = WEB-994 OR parent in (WEB-995, WEB-996)) OR key = WEB-994)) AND (statusCategory != Done) ORDER BY updated DESC',
+    });
+  });
+
+  it('leaves an epic filter alone when the epic has no children', async () => {
+    mockSearchForIssues.mockResolvedValueOnce({ issues: [] }).mockResolvedValueOnce({ issues: [] });
+
+    await issues.listIssues(makeHost(), { limit: 10, issueFilter: '"Epic Link" = WEB-994' });
+
+    expect(searchParams(1)).toMatchObject({
+      jql: '("Epic Link" = WEB-994) AND (statusCategory != Done) ORDER BY updated DESC',
+    });
+  });
+
   it('ANDs the account filter with the search term', async () => {
     mockSearchForIssues.mockResolvedValueOnce({ issues: [] });
     const host = makeHost();
@@ -199,10 +225,10 @@ describe('jira issues plugin', () => {
     const host = makeHost();
     host.credentials = { ...host.credentials, jqlFilter: 'project = WEB' };
 
-    await issues.listIssues(host, { limit: 10, issueFilter: '"Epic Link" = WEB-123' });
+    await issues.listIssues(host, { limit: 10, issueFilter: 'assignee = currentUser()' });
 
     expect(searchParams(0)).toMatchObject({
-      jql: '(project = WEB) AND ("Epic Link" = WEB-123) AND (statusCategory != Done) ORDER BY updated DESC',
+      jql: '(project = WEB) AND (assignee = currentUser()) AND (statusCategory != Done) ORDER BY updated DESC',
     });
   });
 
