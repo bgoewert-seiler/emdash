@@ -448,4 +448,5 @@ Build in a Windows clone, not the WSL checkout: native modules rebuild against t
 - Clone under `%USERPROFILE%\tmp`, not `C:\tmp`. electron-builder denylists `/tmp`, which resolves to `C:\tmp` on Windows and fails the asar symlink check.
 - Use Node 24.14.0 first on `PATH`; the default Node 26 breaks `electron-rebuild`.
 - Unset `NoDefaultCurrentDirectoryInExePath`, or winpty's `GetCommitHash.bat` is not found and node-pty fails to build.
+- `pnpm deploy` fails with EPERM renaming its temp dir onto an in-clone target. The build script uses `%USERPROFILE%\tmp\ed` as the deploy dir on Windows instead.
 - A space in the pnpm install path breaks `apps/emdash-desktop/scripts/postinstall.ts`. Install with `--ignore-scripts` and run `pnpm deploy` with `--ignore-scripts` in the build script copy.
