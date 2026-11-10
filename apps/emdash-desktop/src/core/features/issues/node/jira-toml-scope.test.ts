@@ -69,7 +69,7 @@ describe('jiraTomlScopeJql', () => {
     ].join('\n');
 
     expect(jiraTomlScopeJql(text)).toBe(
-      'project = WEB AND (("Epic Link" = WEB-994 OR key = WEB-994) OR key in (WEB-1043, WEB-1044))'
+      'project = WEB AND (("Epic Link" = WEB-994 OR key = WEB-994 OR parent = WEB-994) OR key in (WEB-1043, WEB-1044))'
     );
   });
 

@@ -111,7 +111,8 @@ function scopedJql(clauses: string[]): string {
 }
 
 /**
- * Sub-tasks link to their parent story, not the epic, so `"Epic Link" = X` never returns them.
+ * Sub-tasks link to their parent story, not the epic, so `"Epic Link" = X` never returns them, and
+ * team-managed epics link their children by `parent`.
  * JQL has no children-of-children operator outside ScriptRunner, so each epic's children are
  * looked up and their sub-tasks added by `parent in (...)`.
  */
@@ -129,7 +130,8 @@ async function withEpicSubtasks(
   const childKeys = new Map<string, string[]>();
   await Promise.all(
     [...epics].map(async (epic) => {
-      const children = await searchJql(client, credentials, `"Epic Link" = ${epic}`, 500, ['key']);
+      const jql = `"Epic Link" = ${epic} OR parent = ${epic}`;
+      const children = await searchJql(client, credentials, jql, 500, ['key']);
       childKeys.set(
         epic,
         children.map((child) => child.key)
@@ -140,7 +142,8 @@ async function withEpicSubtasks(
   return filters.map((filter) =>
     filter.replace(EPIC_LINK_CLAUSE, (clause, epic: string) => {
       const keys = childKeys.get(epic.toUpperCase());
-      return keys && keys.length > 0 ? `(${clause} OR parent in (${keys.join(', ')}))` : clause;
+      const subtasks = keys && keys.length > 0 ? ` OR parent in (${keys.join(', ')})` : '';
+      return `(${clause} OR parent = ${epic}${subtasks})`;
     })
   );
 }
