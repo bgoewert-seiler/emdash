@@ -192,9 +192,11 @@ describe('jira issues plugin', () => {
       issueFilter: '("Epic Link" = WEB-994 OR key = WEB-994)',
     });
 
-    expect(searchParams(0)).toMatchObject({ jql: '"Epic Link" = WEB-994' });
+    expect(searchParams(0)).toMatchObject({
+      jql: '"Epic Link" = WEB-994 OR parent = WEB-994',
+    });
     expect(searchParams(1)).toMatchObject({
-      jql: '((("Epic Link" = WEB-994 OR parent in (WEB-995, WEB-996)) OR key = WEB-994)) AND (statusCategory != Done) ORDER BY updated DESC',
+      jql: '((("Epic Link" = WEB-994 OR parent = WEB-994 OR parent in (WEB-995, WEB-996)) OR key = WEB-994)) AND (statusCategory != Done) ORDER BY updated DESC',
     });
   });
 
@@ -204,7 +206,7 @@ describe('jira issues plugin', () => {
     await issues.listIssues(makeHost(), { limit: 10, issueFilter: '"Epic Link" = WEB-994' });
 
     expect(searchParams(1)).toMatchObject({
-      jql: '("Epic Link" = WEB-994) AND (statusCategory != Done) ORDER BY updated DESC',
+      jql: '(("Epic Link" = WEB-994 OR parent = WEB-994)) AND (statusCategory != Done) ORDER BY updated DESC',
     });
   });
 

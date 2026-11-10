@@ -40,8 +40,8 @@ export function jiraTomlScopeJql(text: string): string | undefined {
   if (issues.some((issue) => !issue)) return undefined;
 
   const selection: string[] = [];
-  // "Epic Link" alone matches the children but not the epic itself.
-  if (epic) selection.push(`("Epic Link" = ${epic} OR key = ${epic})`);
+  // "Epic Link" alone misses the epic itself and children linked by parent (team-managed projects).
+  if (epic) selection.push(`("Epic Link" = ${epic} OR key = ${epic} OR parent = ${epic})`);
   if (issues.length > 0) selection.push(`key in (${issues.join(', ')})`);
 
   const clauses: string[] = [];
