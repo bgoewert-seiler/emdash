@@ -168,6 +168,7 @@ export const provider = registerPluginBehavior(plugin, {
       buildStandardCommand(ctx, {
         autoApproveFlag: '--dangerously-skip-permissions',
         initialPromptFlag: '',
+        endOptionsBeforePrompt: true,
         resumeFlag: '--resume',
         sessionIdFlag: '--session-id',
         modelFlag: '--model',
