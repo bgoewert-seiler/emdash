@@ -192,4 +192,68 @@ describe('buildStandardCommand', () => {
     expect(mIdx).toBeGreaterThanOrEqual(0);
     expect(result.args[mIdx + 1]).toBe('gpt-5-codex');
   });
+
+  describe('endOptionsBeforePrompt', () => {
+    const claudeSpec = {
+      initialPromptFlag: '',
+      endOptionsBeforePrompt: true,
+      sessionIdFlag: '--session-id',
+    };
+
+    it('keeps the prompt positional after an extra arg with an optional value', () => {
+      const result = buildStandardCommand(
+        {
+          cli: 'claude',
+          autoApprove: false,
+          sessionId: 'conversation-1',
+          isResuming: false,
+          model: '',
+          extraArgs: ['--remote-control'],
+          initialPrompt: 'fix the bug',
+        },
+        claudeSpec
+      );
+
+      expect(result.args).toEqual([
+        '--session-id',
+        'conversation-1',
+        '--remote-control',
+        '--',
+        'fix the bug',
+      ]);
+    });
+
+    it('does not add a second separator when extra args already end with one', () => {
+      const result = buildStandardCommand(
+        {
+          cli: 'claude',
+          autoApprove: false,
+          isResuming: false,
+          model: '',
+          extraArgs: ['--remote-control', '--'],
+          initialPrompt: 'fix the bug',
+        },
+        claudeSpec
+      );
+
+      expect(result.args).toEqual(['--remote-control', '--', 'fix the bug']);
+    });
+
+    it('adds no separator when there is no prompt', () => {
+      const result = buildStandardCommand(
+        {
+          cli: 'claude',
+          autoApprove: false,
+          sessionId: 'conversation-1',
+          isResuming: true,
+          model: '',
+          extraArgs: ['--remote-control'],
+          initialPrompt: 'ignored on resume',
+        },
+        { ...claudeSpec, resumeFlag: '--resume' }
+      );
+
+      expect(result.args).toEqual(['--resume', 'conversation-1', '--remote-control']);
+    });
+  });
 });

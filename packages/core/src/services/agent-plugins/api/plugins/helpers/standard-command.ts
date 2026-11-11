@@ -25,6 +25,11 @@ export type StandardCommandSpec = {
    * (prompt appended as last arg without a flag). Leave undefined to skip prompt injection.
    */
   initialPromptFlag?: string;
+  /**
+   * Put `--` before a positional prompt so a user extra arg with an optional value
+   * (Claude's `--remote-control [name]`) cannot consume the prompt as that value.
+   */
+  endOptionsBeforePrompt?: boolean;
   /** Whether the initial prompt should be delivered via stdin pipe instead of CLI args. */
   initialPromptViaStdinPipe?: boolean;
   /**
@@ -140,6 +145,7 @@ export function buildStandardCommand(ctx: CommandContext, spec: StandardCommandS
       // Handled later by caller via wrapWithStdinPipe
     } else if (spec.initialPromptFlag !== undefined) {
       if (spec.initialPromptFlag === '') {
+        if (spec.endOptionsBeforePrompt && args.at(-1) !== '--') args.push('--');
         args.push(ctx.initialPrompt);
       } else {
         args.push(...splitFlag(spec.initialPromptFlag), ctx.initialPrompt);
