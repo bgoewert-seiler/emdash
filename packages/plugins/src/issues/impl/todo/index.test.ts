@@ -124,10 +124,10 @@ describe('TODOs issues plugin: working tree', () => {
     expect(data.map((issue) => [issue.identifier, issue.title, issue.displayIdentifier])).toEqual([
       ['md:TODO.md:4', 'Rotate the staging key', 'TODO.md:4'],
       ['md:TODO.md:6', 'Nested step', 'TODO.md:6'],
-      ['md:packages/api/TODO.md:1', 'Version the API', 'packages/api/TODO.md:1'],
-      ['code:docs/guide.md:2', 'expand', 'docs/guide.md:2'],
-      ['code:src/app.ts:1', 'handle empty input', 'src/app.ts:1'],
-      ['code:src/lib.py:1', 'leaks a handle', 'src/lib.py:1'],
+      ['md:packages/api/TODO.md:1', 'Version the API', 'TODO.md:1'],
+      ['code:docs/guide.md:2', 'expand', 'guide.md:2'],
+      ['code:src/app.ts:1', 'handle empty input', 'app.ts:1'],
+      ['code:src/lib.py:1', 'leaks a handle', 'lib.py:1'],
     ]);
     expect(data.every((issue) => issue.sourceBranch === undefined)).toBe(true);
     expect(data[5]?.description).toBe('FIXME in src/lib.py:1');
@@ -288,8 +288,8 @@ describe('TODOs issues plugin: branches', () => {
       todoSettings: settings,
     });
     expect(data.map((issue) => [issue.identifier, issue.displayIdentifier])).toEqual([
-      ['code:src/a.ts:2', 'src/a.ts:2'],
-      ['code@feature/x:src/a.ts:3', 'feature/x · src/a.ts:3'],
+      ['code:src/a.ts:2', 'a.ts:2'],
+      ['code@feature/x:src/a.ts:3', 'feature/x · a.ts:3'],
     ]);
     expect(data[1]?.sourceBranch).toEqual({ type: 'local', branch: 'feature/x' });
   });
