@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { isValidOpenInAppId, OPEN_IN_APPS, type PlatformConfig } from './open-in-apps';
 
 describe('OPEN_IN_APPS', () => {
-  it('tries the default Linux terminal before distro-specific fallbacks', () => {
+  it('tries Windows Terminal under WSL, then the default Linux terminal, then distro fallbacks', () => {
     expect(OPEN_IN_APPS.terminal.platforms.linux?.openCommands).toEqual([
+      '(case "$WSL_DISTRO_NAME" in "" | *[!A-Za-z0-9._-]*) false ;; *) wt.exe -w 0 nt -d . wsl.exe -d "$WSL_DISTRO_NAME" ;; esac)',
       'xdg-terminal-exec --dir={{path}}',
       '([ -n "$TERMINAL" ] && "$TERMINAL")',
       'x-terminal-emulator --working-directory={{path}}',
