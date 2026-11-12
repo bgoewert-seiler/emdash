@@ -1,7 +1,7 @@
 import type * as ChildProcess from 'node:child_process';
 import type { ExecFileOptions } from 'node:child_process';
 import { EventEmitter } from 'node:events';
-import { mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { LOCAL_HOST_REF, hostRef } from '@emdash/core/primitives/host/api';
@@ -286,6 +286,46 @@ describe('AppService.openIn', () => {
         await rm(path.join(bin, 'xdg-terminal-exec'));
         await appService.openIn({ app: 'terminal', path: bin });
         expect(await readFile(launched, 'utf8')).toBe('user-terminal \n');
+      } finally {
+        await rm(bin, { recursive: true, force: true });
+      }
+    }
+  );
+
+  it.skipIf(process.platform === 'win32')(
+    'opens a Windows Terminal tab in the WSL distro before any Linux terminal',
+    async () => {
+      setPlatform('linux');
+      const { exec } = await vi.importActual<typeof ChildProcess>('node:child_process');
+      mocks.exec.mockImplementation(exec);
+      const bin = await realpath(await mkdtemp(path.join(os.tmpdir(), 'emdash-open-in-wsl-')));
+      const launched = path.join(bin, 'launched.log');
+      // Windows Terminal splits its command line on ';', so the target must not reach wt.exe.
+      const target = path.join(bin, 'a;nt calc.exe');
+      await mkdir(target);
+      for (const name of ['wt.exe', 'xdg-terminal-exec']) {
+        await writeFile(
+          path.join(bin, name),
+          `#!/bin/sh\necho "${name} $* @ $(pwd)" >> "${launched}"\n`,
+          { mode: 0o755 }
+        );
+      }
+
+      try {
+        mocks.launchEnv = { PATH: bin, WSL_DISTRO_NAME: 'Ubuntu' };
+        await appService.openIn({ app: 'terminal', path: target });
+        expect(await readFile(launched, 'utf8')).toBe(
+          `wt.exe -w 0 nt -d . wsl.exe -d Ubuntu @ ${target}\n`
+        );
+
+        for (const env of [{ PATH: bin }, { PATH: bin, WSL_DISTRO_NAME: 'Ubuntu;nt calc.exe' }]) {
+          await rm(launched, { force: true });
+          mocks.launchEnv = env;
+          await appService.openIn({ app: 'terminal', path: target });
+          expect(await readFile(launched, 'utf8')).toBe(
+            `xdg-terminal-exec --dir=${target} @ ${target}\n`
+          );
+        }
       } finally {
         await rm(bin, { recursive: true, force: true });
       }

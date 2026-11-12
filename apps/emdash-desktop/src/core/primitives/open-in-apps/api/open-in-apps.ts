@@ -216,9 +216,13 @@ const _OPEN_IN_APPS = {
         openCommands: ['wt -d {{path}}', 'start cmd /K "cd /d {{path_raw}}"'],
       },
       linux: {
-        // Prefer the user's default terminal (XDG default-terminal launcher, then $TERMINAL,
-        // which opens in the exec cwd) before the distro-specific fallbacks.
+        // Under WSL, a new Windows Terminal tab in this distro; WSLg images usually ship no
+        // working Linux terminal. wt.exe splits its command line on `;`, so the path stays in the
+        // exec cwd (`-d .`) and a distro name outside [A-Za-z0-9._-] skips this entry. Elsewhere
+        // prefer the user's default terminal (XDG launcher, then $TERMINAL, which opens in the
+        // exec cwd) before the distro-specific fallbacks.
         openCommands: [
+          '(case "$WSL_DISTRO_NAME" in "" | *[!A-Za-z0-9._-]*) false ;; *) wt.exe -w 0 nt -d . wsl.exe -d "$WSL_DISTRO_NAME" ;; esac)',
           'xdg-terminal-exec --dir={{path}}',
           '([ -n "$TERMINAL" ] && "$TERMINAL")',
           'x-terminal-emulator --working-directory={{path}}',
