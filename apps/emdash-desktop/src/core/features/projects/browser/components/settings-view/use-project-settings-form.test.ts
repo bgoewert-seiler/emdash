@@ -45,6 +45,7 @@ function domains(setup: string): ProjectSettingsDomains {
     gitIdentity: { stored: {} },
     integrationAccounts: { stored: {} },
     issueFilters: { stored: {} },
+    todos: { stored: {} },
     placement: {
       stored: {},
       layers: {
@@ -94,6 +95,7 @@ describe('useProjectSettingsForm', () => {
           gitIdentity: saved.gitIdentity,
           integrationAccounts: saved.integrationAccounts,
           issueFilters: saved.issueFilters,
+          todos: saved.todos,
           placement: { stored: saved.placement.stored },
         },
         host: {

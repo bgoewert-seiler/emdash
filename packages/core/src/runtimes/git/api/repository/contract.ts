@@ -21,6 +21,8 @@ import {
   fetchJobInputSchema,
   fetchPrForReviewJobInputSchema,
   gitTreeEntrySchema,
+  grepInputSchema,
+  grepResultSchema,
   listTreeInputSchema,
 } from './schemas';
 
@@ -56,6 +58,12 @@ export const gitRepositoryContract = defineContract({
   listTree: fallible({
     input: listTreeInputSchema,
     data: z.object({ entries: z.array(gitTreeEntrySchema).nullable() }),
+    error: gitCommandErrorSchema,
+  }),
+  /** Read-only `git grep` over the tracked content at a ref; never touches the worktree. */
+  grep: fallible({
+    input: grepInputSchema,
+    data: grepResultSchema,
     error: gitCommandErrorSchema,
   }),
 

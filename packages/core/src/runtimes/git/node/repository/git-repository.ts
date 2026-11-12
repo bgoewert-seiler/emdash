@@ -7,6 +7,7 @@ import {
   type GitRefsState,
   type GitRemotesState,
   type GitTreeEntry,
+  type GrepResult,
   type GitWorktreesState,
 } from '#runtimes/git/api';
 import type { RepositoryIdentity } from '#runtimes/git/node/allocation/identity';
@@ -17,6 +18,7 @@ import {
   execGitWithProgress,
   throwIfGitOpAborted,
 } from '#runtimes/git/node/exec/transfer-progress';
+import { grep, type GrepOptions } from '#runtimes/git/node/repository/ops/grep';
 import { computeRefsState } from '#runtimes/git/node/repository/ops/refs';
 import {
   computeRemotesState,
@@ -68,6 +70,11 @@ export class GitRepository {
   /** One directory level at `ref`; `null` when the ref or the directory does not exist. */
   listTree(ref: string, path: string): Promise<Result<GitTreeEntry[] | null, GitCommandError>> {
     return listTree(this.exec, ref, path);
+  }
+
+  /** Read-only `git grep` over the tracked content at `ref`. */
+  grep(ref: string, options: GrepOptions): Promise<Result<GrepResult, GitCommandError>> {
+    return grep(this.exec, ref, options);
   }
 
   // -- Remotes and network ----------------------------------------------------------

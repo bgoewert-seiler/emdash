@@ -23,10 +23,21 @@ function setup(hasRepository = true) {
     success: true as const,
     data: { content: '# Add thing\n' },
   }));
+  const grep = vi.fn(async () => ({
+    success: true as const,
+    data: {
+      hits: [
+        { path: 'src/a.ts', line: 3, text: '// TODO: x' },
+        { path: '../escape.ts', line: 1, text: '// TODO: y' },
+      ],
+      truncated: false,
+    },
+  }));
   const git = {
     repository: {
       model: { state: () => ({ snapshot: async () => ({ data: REFS }) }) },
       listTree,
+      grep,
     },
     checkout: { getFile },
   } as unknown as GitRuntimeClient;
@@ -36,8 +47,9 @@ function setup(hasRepository = true) {
     repository,
     hasRepository,
     getBaseRemote: async () => 'origin',
+    getSearchExclusions: async () => ['node_modules'],
   });
-  return { reader, listTree, getFile };
+  return { reader, listTree, getFile, grep };
 }
 
 describe('createProjectGitReader', () => {
@@ -76,6 +88,31 @@ describe('createProjectGitReader', () => {
     const { reader, listTree } = setup();
     expect(await reader.listTree('HEAD', '../outside')).toBeNull();
     expect(listTree).not.toHaveBeenCalled();
+  });
+
+  it('greps a listed branch by its full ref and drops paths that escape the project', async () => {
+    const { reader, grep } = setup();
+    const [, featureX] = (await reader.listBranches()) ?? [];
+    if (!featureX) throw new Error('expected branches');
+    expect(await reader.grep(featureX, ['TODO'], { pathspec: [':(glob)**/*.ts'] })).toEqual({
+      hits: [{ path: 'src/a.ts', line: 3, text: '// TODO: x' }],
+      truncated: false,
+    });
+    expect(grep).toHaveBeenCalledWith(
+      expect.objectContaining({
+        ref: 'refs/heads/feature/x',
+        patterns: ['TODO'],
+        pathspec: [':(glob)**/*.ts'],
+        exclusions: ['node_modules'],
+      })
+    );
+  });
+
+  it('refuses to grep a branch that is not in the repository', async () => {
+    const { reader, grep } = setup();
+    const ghost = { type: 'local' as const, branch: '--output=x', oid: 'z', isDefault: false };
+    expect(await reader.grep(ghost, ['TODO'])).toBeNull();
+    expect(grep).not.toHaveBeenCalled();
   });
 
   it('answers null from listBranches when the project is not a git repository', async () => {

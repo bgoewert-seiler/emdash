@@ -20,6 +20,7 @@ import type {
 import { ProjectSettingsFooter } from './project-settings-footer';
 import { BaseProjectSettingsSection } from './sections/base-project-settings-section';
 import { ShareableSettingsSection } from './sections/shareable-project-settings-section';
+import { TodosSection } from './sections/todos-section';
 import { useProjectSettingsForm } from './use-project-settings-form';
 
 export interface ProjectSettingsFormProps {
@@ -94,6 +95,11 @@ export const ProjectSettingsForm = observer(function ProjectSettingsForm({
             updatePlacement={formModel.updatePlacement}
             hostActionReason={hostActionReason}
             hostObservationKind={hostObservationKind}
+          />
+          <TodosSection
+            todosForm={formModel.form.todos}
+            todosErrors={formModel.todosErrors}
+            updateTodos={formModel.updateTodos}
           />
           {hostObservationKind === 'unavailable' ? (
             <div

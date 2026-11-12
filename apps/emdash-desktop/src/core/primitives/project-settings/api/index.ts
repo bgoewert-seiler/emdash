@@ -4,3 +4,4 @@ export * from './project-settings';
 export * from './project-settings-fields';
 export * from './resolve-provider-account';
 export * from './worktree-root';
+export * from './todo-settings';

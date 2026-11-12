@@ -12,6 +12,7 @@ import {
   type GitRefsState,
   type GitRemotesState,
   type GitTransferProgress,
+  type GrepInput,
   type ListTreeInput,
   type RepositorySelector,
 } from '#runtimes/git/api';
@@ -68,6 +69,16 @@ export class GitRepositoryRuntime {
       const result = await repository.listTree(input.ref, input.path);
       return result.success ? ok({ entries: result.data }) : result;
     });
+  }
+
+  grep(input: GrepInput) {
+    return this.run(input, (repository) =>
+      repository.grep(input.ref, {
+        patterns: input.patterns,
+        pathspec: input.pathspec,
+        exclusions: input.exclusions,
+      })
+    );
   }
 
   fetch(input: FetchJobInput, context: LiveJobContext<GitTransferProgress>) {

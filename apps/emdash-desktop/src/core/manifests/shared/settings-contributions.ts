@@ -5,6 +5,7 @@ import {
 } from '@core/features/browser/contributions/settings';
 import { preferredConversationTypeSettingsContribution } from '@core/features/conversations/contributions/settings';
 import { filesSettingsContribution } from '@core/features/editor/contributions/settings';
+import { todoSettingsContribution } from '@core/features/issues/contributions/settings';
 import {
   localProjectSettingsSchemaContribution,
   projectSettingsContribution,
@@ -34,6 +35,7 @@ export const appSettingsSchemaContributions = {
   project: projectSettingsContribution,
   tasks: taskSettingsContribution,
   files: filesSettingsContribution,
+  todos: todoSettingsContribution,
   defaultAgent: defaultAgentSettingsContribution,
   preferredConversationType: preferredConversationTypeSettingsContribution,
   keyboard: keyboardSettingsContribution,

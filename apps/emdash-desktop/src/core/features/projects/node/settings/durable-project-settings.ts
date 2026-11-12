@@ -5,8 +5,13 @@ import type {
   ProjectIntegrationAccountsPatch,
   ProjectIssueFiltersPatch,
   ProjectSettingsDomainPatch,
+  ProjectTodosPatch,
 } from '@core/features/projects/api/project-settings-page';
-import type { StoredBaseProjectSettings } from '@core/primitives/project-settings/api';
+import {
+  todoFileCapSchema,
+  todoKeywordsSchema,
+  type StoredBaseProjectSettings,
+} from '@core/primitives/project-settings/api';
 import type { UpdateProjectSettingsError } from '@core/primitives/projects/api';
 import {
   readStoredProjectSettings,
@@ -22,7 +27,7 @@ export interface DurableProjectSettingsAuthority {
     projectId: string,
     patch: Pick<
       ProjectSettingsDomainPatch,
-      'gitIdentity' | 'integrationAccounts' | 'issueFilters' | 'placement'
+      'gitIdentity' | 'integrationAccounts' | 'issueFilters' | 'todos' | 'placement'
     >
   ): Promise<Result<void, UpdateProjectSettingsError>>;
 }
@@ -46,7 +51,7 @@ export class DesktopProjectSettingsAuthority implements DurableProjectSettingsAu
     projectId: string,
     patch: Pick<
       ProjectSettingsDomainPatch,
-      'gitIdentity' | 'integrationAccounts' | 'issueFilters' | 'placement'
+      'gitIdentity' | 'integrationAccounts' | 'issueFilters' | 'todos' | 'placement'
     >
   ): Promise<Result<void, UpdateProjectSettingsError>> {
     try {
@@ -73,6 +78,7 @@ export class DesktopProjectSettingsAuthority implements DurableProjectSettingsAu
         }
         applyIntegrationAccountsPatch(next, patch.integrationAccounts?.stored);
         applyIssueFiltersPatch(next, patch.issueFilters?.stored);
+        applyTodosPatch(next, patch.todos?.stored);
         const tmux = patch.placement?.stored.tmux;
         if (patch.placement && Object.hasOwn(patch.placement.stored, 'tmux')) {
           next.tmuxDefaultMigrated = true;
@@ -142,12 +148,35 @@ export function applyIssueFiltersPatch(
   else next.issueFilters = merged;
 }
 
+/**
+ * Value sets the override, `null` restores inheritance. The Wire boundary passes values through
+ * untyped, so each is validated here and an invalid one fails the whole patch.
+ */
+export function applyTodosPatch(
+  next: StoredBaseProjectSettings,
+  patch: ProjectTodosPatch | undefined
+): void {
+  if (patch === undefined) return;
+  const merged = { ...(next.todos ?? {}) };
+  if (Object.hasOwn(patch, 'fileCap')) {
+    if (patch.fileCap === null || patch.fileCap === undefined) delete merged.fileCap;
+    else merged.fileCap = todoFileCapSchema.parse(patch.fileCap);
+  }
+  if (Object.hasOwn(patch, 'keywords')) {
+    if (patch.keywords === null || patch.keywords === undefined) delete merged.keywords;
+    else merged.keywords = todoKeywordsSchema.parse(patch.keywords);
+  }
+  if (Object.keys(merged).length === 0) delete next.todos;
+  else next.todos = merged;
+}
+
 function durableDomains(stored: StoredBaseProjectSettings): ProjectDurableSettingsDomains {
   const {
     worktreeRoot,
     tmux,
     integrationAccounts,
     issueFilters,
+    todos,
     tmuxDefaultMigrated: _migration,
     ...gitIdentity
   } = stored;
@@ -155,6 +184,7 @@ function durableDomains(stored: StoredBaseProjectSettings): ProjectDurableSettin
     gitIdentity: { stored: gitIdentity },
     integrationAccounts: { stored: integrationAccounts ?? {} },
     issueFilters: { stored: issueFilters ?? {} },
+    todos: { stored: todos ?? {} },
     placement: {
       stored: {
         ...(worktreeRoot !== undefined ? { worktreeRoot } : {}),

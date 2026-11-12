@@ -22,6 +22,8 @@ function projectFiles(files: Record<string, string>, dirs: string[]): ProjectFil
     listDirectories: async (path) =>
       path === 'openspec/changes' ? dirs : path === 'openspec' && dirs.length ? ['changes'] : null,
     readText: async (path) => files[path] ?? null,
+    findFiles: async () => null,
+    searchText: async () => null,
   };
 }
 
@@ -174,6 +176,7 @@ function projectGit(
       reads.push(`${branch.branch}:${path}`);
       return find(branch)?.files?.[path] ?? null;
     },
+    grep: async () => null,
   };
 }
 
@@ -243,6 +246,7 @@ describe('openspec changes on other branches', () => {
       },
       listTree: async () => null,
       readTextAt: async () => null,
+      grep: async () => null,
     };
     expect(await listIds(broken, files)).toEqual([
       ['add-release-driver', null],

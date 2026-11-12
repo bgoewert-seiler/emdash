@@ -35,6 +35,8 @@ import {
   type IssueFiltersFormState,
   type LifecycleFormState,
   type PlacementFormState,
+  type TodosFormState,
+  todosFormErrors,
 } from './project-settings-form-model';
 import { projectConfigTargetValue } from './share-project-config-modal';
 import { DEFAULT_WRITE_FIELDS } from './shareable-project-settings-fields';
@@ -164,6 +166,13 @@ export function useProjectSettingsForm({
     [updateSection]
   );
 
+  const updateTodos = useCallback<FormUpdate<TodosFormState>>(
+    (key, value) => updateSection('todos', key, value),
+    [updateSection]
+  );
+  const todosErrors = todosFormErrors(form.todos);
+  const hasTodosErrors = Object.keys(todosErrors).length > 0;
+
   const getOverrideSources = useCallback(
     (field: ShareableProjectSettingsWriteField) => {
       const formValue = normalizeShareableFieldValue(field, shareableFieldFormValue(form, field));
@@ -185,6 +194,8 @@ export function useProjectSettingsForm({
   );
 
   const handleSave = useCallback(async () => {
+    // Invalid TODOs fields show their message inline and are never saved.
+    if (hasTodosErrors) return;
     setSaveStatus('saving');
 
     const result = await save(
@@ -216,7 +227,7 @@ export function useProjectSettingsForm({
 
     setWorktreeDirectoryError(null);
     setSaveStatus('error');
-  }, [domains, form, onSuccess, remotes, resolvedSnapshot.touchedFields, save]);
+  }, [domains, form, hasTodosErrors, onSuccess, remotes, resolvedSnapshot.touchedFields, save]);
 
   const openShareConfigModal = useCallback(() => {
     if (!canShareConfig || shareDisabled) return;
@@ -317,6 +328,8 @@ export function useProjectSettingsForm({
     updateGitIdentity,
     updateIntegrationAccounts,
     updateIssueFilters,
+    updateTodos,
+    todosErrors,
     updatePlacement,
     getOverrideSources,
     handleSave,
@@ -338,6 +351,7 @@ function mergeProjectSettingsPage(
     gitIdentity: page.durable.gitIdentity,
     integrationAccounts: page.durable.integrationAccounts,
     issueFilters: page.durable.issueFilters,
+    todos: page.durable.todos,
     placement: {
       ...host.placement,
       ...page.durable.placement,

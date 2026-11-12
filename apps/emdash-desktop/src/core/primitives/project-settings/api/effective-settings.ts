@@ -1,5 +1,12 @@
 import type { PlacementContext } from './placement';
 import type { AgentGitCredentialsSetting } from './project-settings';
+import {
+  DEFAULT_TODO_SETTINGS,
+  todoFileCapSchema,
+  todoKeywordsSchema,
+  type StoredTodoOverrides,
+  type TodoSettings,
+} from './todo-settings';
 import { normalizeWorktreeRootPath } from './worktree-root';
 
 /**
@@ -352,4 +359,46 @@ export function resolveTmux(
     value: layers.appDefaultTmux,
     provenance: { kind: 'inferred', from: 'app default' },
   };
+}
+
+// ---------------------------------------------------------------------------
+// TODOs source: project override → app setting → built-in, per field
+// ---------------------------------------------------------------------------
+
+export type EffectiveTodoSettings = {
+  fileCap: Resolved<number>;
+  keywords: Resolved<string[]>;
+};
+
+/**
+ * Each field resolves on its own, so overriding the cap does not pin the keywords. Every layer
+ * is validated again here: a stored value that fails is skipped, never handed to a search.
+ */
+export function resolveTodoSettings(layers: {
+  project?: StoredTodoOverrides;
+  app?: Partial<TodoSettings>;
+}): EffectiveTodoSettings {
+  return {
+    fileCap: resolveTodoField(todoFileCapSchema, layers, 'fileCap'),
+    keywords: resolveTodoField(todoKeywordsSchema, layers, 'keywords'),
+  };
+}
+
+function resolveTodoField<K extends keyof TodoSettings>(
+  schema: { safeParse(value: unknown): { success: boolean } },
+  layers: { project?: StoredTodoOverrides; app?: Partial<TodoSettings> },
+  field: K
+): Resolved<TodoSettings[K]> {
+  const project = layers.project?.[field];
+  if (project !== undefined && schema.safeParse(project).success) {
+    return { value: project as TodoSettings[K], provenance: { kind: 'set' } };
+  }
+  const app = layers.app?.[field];
+  if (app !== undefined && schema.safeParse(app).success) {
+    return {
+      value: app as TodoSettings[K],
+      provenance: { kind: 'inferred', from: 'app settings' },
+    };
+  }
+  return { value: DEFAULT_TODO_SETTINGS[field], provenance: { kind: 'inferred', from: 'default' } };
 }

@@ -14,6 +14,7 @@ import type {
   StoredIntegrationAccount,
   StoredIntegrationAccounts,
   StoredIssueFilters,
+  StoredTodoOverrides,
   StoredProjectGitSettings,
 } from '@core/primitives/project-settings/api';
 import type { UpdateProjectSettingsError } from '@core/primitives/projects/api';
@@ -76,6 +77,11 @@ export type ProjectIssueFiltersDomainSnapshot = {
   stored: StoredIssueFilters;
 };
 
+/** Explicit TODOs source overrides only; absent fields inherit the app settings. */
+export type ProjectTodosDomainSnapshot = {
+  stored: StoredTodoOverrides;
+};
+
 export type ProjectPlacementDomainSnapshot = {
   stored: {
     worktreeRoot?: string;
@@ -95,6 +101,7 @@ export type ProjectSettingsDomains = {
   gitIdentity: ProjectGitIdentityDomainSnapshot;
   integrationAccounts: ProjectIntegrationAccountsDomainSnapshot;
   issueFilters: ProjectIssueFiltersDomainSnapshot;
+  todos: ProjectTodosDomainSnapshot;
   placement: ProjectPlacementDomainSnapshot;
 };
 
@@ -102,6 +109,7 @@ export type ProjectDurableSettingsDomains = {
   gitIdentity: ProjectGitIdentityDomainSnapshot;
   integrationAccounts: ProjectIntegrationAccountsDomainSnapshot;
   issueFilters: ProjectIssueFiltersDomainSnapshot;
+  todos: ProjectTodosDomainSnapshot;
   placement: Pick<ProjectPlacementDomainSnapshot, 'stored'>;
 };
 
@@ -129,6 +137,12 @@ export type ProjectIntegrationAccountsPatch = Partial<
 /** Values set one provider's filter; null clears it; absent keys are untouched. */
 export type ProjectIssueFiltersPatch = Partial<Record<string, string | null>>;
 
+/** A value overrides that field; null removes the override; absent fields are untouched. */
+export type ProjectTodosPatch = {
+  fileCap?: number | null;
+  keywords?: string[] | null;
+};
+
 export type ProjectPlacementStoredPatch = {
   worktreeRoot?: string | null;
   tmux?: boolean | null;
@@ -152,6 +166,9 @@ export type ProjectSettingsDomainPatch = {
   };
   issueFilters?: {
     stored: ProjectIssueFiltersPatch;
+  };
+  todos?: {
+    stored: ProjectTodosPatch;
   };
   placement?: {
     stored: ProjectPlacementStoredPatch;

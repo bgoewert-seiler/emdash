@@ -52,7 +52,7 @@ const testDependencies: PluginIssueProviderDependencies = {
 
 function makePlugin(overrides: {
   integrationId?: string;
-  requiredInputs?: ('repositoryUrl' | 'projectFiles')[];
+  requiredInputs?: ('repositoryUrl' | 'projectFiles' | 'todoSettings')[];
   listIssues?: ReturnType<typeof vi.fn>;
   searchIssues?: ReturnType<typeof vi.fn>;
   getIssue?: ReturnType<typeof vi.fn>;
@@ -87,7 +87,12 @@ describe('createPluginIssueProvider', () => {
   });
 
   it('serves account-less sources from project files without an account', async () => {
-    const files = { listDirectories: vi.fn(), readText: vi.fn() };
+    const files = {
+      listDirectories: vi.fn(),
+      readText: vi.fn(),
+      findFiles: vi.fn(),
+      searchText: vi.fn(),
+    };
     const listIssues = vi.fn(async () => ok([{ identifier: 'add-thing', title: 'Add thing' }]));
     const isAvailable = vi.fn(async () => true);
     const provider = createPluginIssueProvider(
@@ -114,6 +119,40 @@ describe('createPluginIssueProvider', () => {
     expect(isAvailable).toHaveBeenCalledWith({ projectFiles: files });
     await expect(provider.checkConnection()).resolves.toMatchObject({ connected: true });
     expect(mockCheckConnection).not.toHaveBeenCalled();
+  });
+
+  it("hands the project's TODOs settings to plugins that ask for them, read on every call", async () => {
+    const listIssues = vi.fn(async (_host: unknown, _opts: { todoSettings?: unknown }) => ok([]));
+    const getIssue = vi.fn(async () => ok({ identifier: 'md:TODO.md:1', title: 'x' }));
+    let fileCap = 10;
+    const resolveTodoSettings = vi.fn(async () => ({ fileCap, keywords: ['TODO'] }));
+    const provider = createPluginIssueProvider(
+      makePlugin({ integrationId: 'todo', requiredInputs: ['todoSettings'], listIssues, getIssue }),
+      { ...testDependencies, resolveTodoSettings }
+    );
+    await provider.listIssues({ projectId: 'p1' });
+    fileCap = 20;
+    await provider.listIssues({ projectId: 'p1' });
+    await provider.getIssueContext?.({ projectId: 'p1', identifier: 'md:TODO.md:1' });
+    expect(listIssues.mock.calls.map(([, opts]) => opts.todoSettings)).toEqual([
+      { fileCap: 10, keywords: ['TODO'] },
+      { fileCap: 20, keywords: ['TODO'] },
+    ]);
+    expect(getIssue).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ todoSettings: { fileCap: 20, keywords: ['TODO'] } })
+    );
+    expect(resolveTodoSettings).toHaveBeenCalledWith('p1');
+
+    const other = vi.fn(async () => ok([]));
+    await createPluginIssueProvider(makePlugin({ integrationId: 'openspec', listIssues: other }), {
+      ...testDependencies,
+      resolveTodoSettings,
+    }).listIssues({ projectId: 'p1' });
+    expect(other).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ todoSettings: undefined })
+    );
   });
 
   it('retains the source account on issues returned by a default-account lookup', async () => {

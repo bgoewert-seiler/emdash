@@ -22,6 +22,10 @@ export type {
   IssueSourceBranch,
   ProjectFilesReader,
   ProjectGitReader,
+  ProjectGrepOpts,
+  ProjectGrepResult,
+  ProjectTextHit,
   SourceBranch,
+  TodoSourceSettings,
 } from './types';
 export type { IIssuesBehavior, IssuesDescriptor } from './capabilities/issues';

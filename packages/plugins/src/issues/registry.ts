@@ -10,6 +10,7 @@ import { provider as notion } from './impl/notion';
 import { provider as openspec } from './impl/openspec';
 import { provider as plain } from './impl/plain';
 import { provider as plane } from './impl/plane';
+import { provider as todo } from './impl/todo';
 import { provider as trello } from './impl/trello';
 import { provider as youtrack } from './impl/youtrack';
 import type { IssuesPluginProvider } from './plugin';
@@ -44,6 +45,7 @@ for (const provider of [
   plain,
   youtrack,
   openspec,
+  todo,
 ]) {
   issuesPluginRegistry.register(provider);
 }

@@ -58,3 +58,48 @@ export const listTreeInputSchema = repositorySelectorSchema.extend({
   path: z.string(),
 });
 export type ListTreeInput = z.infer<typeof listTreeInputSchema>;
+
+// -- Grep --
+
+/** Bounds on `grep` input; patterns are built by plugins from escaped keywords. */
+export const GREP_MAX_PATTERNS = 21;
+export const GREP_MAX_PATTERN_LENGTH = 256;
+export const GREP_MAX_PATHSPECS = 8;
+export const GREP_MAX_EXCLUSIONS = 500;
+/** Output beyond this is dropped and reported as `truncated`. */
+export const GREP_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
+
+/** One argv element; NUL and newlines would break git's line-oriented pattern and output. */
+const grepArgSchema = z
+  .string()
+  .min(1)
+  .max(GREP_MAX_PATTERN_LENGTH)
+  .refine((value) => !/[\0\r\n]/u.test(value), {
+    message: 'Grep arguments cannot contain NUL or newline characters',
+  });
+
+export const grepInputSchema = repositorySelectorSchema.extend({
+  /** A full ref, or `HEAD` of the repository's main worktree. */
+  ref: z.union([gitFullRefSchema, z.literal('HEAD')]),
+  /** Extended regular expressions, matched case-sensitively; any one matching selects a line. */
+  patterns: z.array(grepArgSchema).min(1).max(GREP_MAX_PATTERNS),
+  /** Git pathspecs that narrow the search; the whole tree when empty. */
+  pathspec: z.array(grepArgSchema).max(GREP_MAX_PATHSPECS).default([]),
+  /** Search exclusion patterns (the file-search policy) applied as `:(exclude)` pathspecs. */
+  exclusions: z.array(grepArgSchema).max(GREP_MAX_EXCLUSIONS).default([]),
+});
+export type GrepInput = z.infer<typeof grepInputSchema>;
+
+export const grepHitSchema = z.object({
+  path: z.string(),
+  line: z.number().int().positive(),
+  text: z.string(),
+});
+export type GrepHit = z.infer<typeof grepHitSchema>;
+
+export const grepResultSchema = z.object({
+  hits: z.array(grepHitSchema),
+  /** True when output passed the byte cap and later hits were dropped. */
+  truncated: z.boolean(),
+});
+export type GrepResult = z.infer<typeof grepResultSchema>;

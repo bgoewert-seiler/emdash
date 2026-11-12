@@ -3,6 +3,7 @@ import { useObserver } from 'mobx-react-lite';
 import { useEffect, useMemo, useState } from 'react';
 import { getIssuesClient } from '@core/features/issues/api/browser/client';
 import { getProjectSettingsStore } from '@core/features/projects/api/browser/stores/project-selectors';
+import { useAppSettingsKey } from '@core/features/settings/api/browser/use-app-settings-key';
 import type {
   IssueAccountUnavailableError,
   IssueProviderType,
@@ -56,7 +57,7 @@ export function useIssues(
   const [debouncedTerm, setDebouncedTerm] = useState('');
   const accountInventory = useAccounts();
   const projectAccountContext = useObserver(() => {
-    if (!projectId) return { ready: true, choice: undefined, filter: '', error: null };
+    if (!projectId) return { ready: true, choice: undefined, filter: '', todos: '', error: null };
     const settings = getProjectSettingsStore(projectId);
     const accounts = settings?.durableDomains?.integrationAccounts;
     return {
@@ -64,9 +65,15 @@ export function useIssues(
       choice: provider ? accounts?.stored[provider] : undefined,
       // The server reads the saved filter itself; it is keyed here so a save refreshes the lists.
       filter: (provider && settings?.durableDomains?.issueFilters?.stored[provider]) || '',
+      todos:
+        provider === 'todo' ? JSON.stringify(settings?.durableDomains?.todos?.stored ?? {}) : '',
       error: settings?.pageData.error ?? null,
     };
   });
+  // The server resolves TODOs settings itself; keying on them makes a save refresh the list.
+  const { value: appTodos } = useAppSettingsKey('todos');
+  const todosKey =
+    provider === 'todo' ? `${projectAccountContext.todos}|${JSON.stringify(appTodos ?? null)}` : '';
   const accountKey = providerAccountContextKey(
     projectAccountContext.choice,
     (provider ? accountInventory.data?.[provider] : undefined) ?? []
@@ -78,6 +85,7 @@ export function useIssues(
     repositoryUrl ?? '',
     searchLimit,
     projectAccountContext.filter,
+    todosKey,
     accountKey,
   ]);
 
@@ -106,6 +114,7 @@ export function useIssues(
       repositoryUrl ?? '',
       initialLimit,
       projectAccountContext.filter,
+      todosKey,
       accountKey,
     ],
     queryFn: async () => {

@@ -234,4 +234,43 @@ describe('project issue provider availability', () => {
       }
     }
   );
+  it('offers the TODOs source in every project, next to OpenSpec', async () => {
+    mocks.context.mockReturnValue({
+      integrations: [
+        {
+          id: 'openspec',
+          features: ['issues'],
+          issueCapabilities: { requiresProjectFiles: true, requiresAccount: false },
+        },
+        {
+          id: 'todo',
+          features: ['issues'],
+          issueCapabilities: { requiresProjectFiles: true, requiresAccount: false },
+        },
+      ],
+      integrationAccounts: {},
+      isLoadingAccounts: false,
+    });
+    mocks.settings.mockReturnValue(undefined);
+    mocks.listProjectSources.mockResolvedValue(['openspec', 'todo']);
+    const dom = new JSDOM('<!doctype html><html><body><div id="root"></div></body></html>');
+    vi.stubGlobal('IS_REACT_ACT_ENVIRONMENT', true);
+    vi.stubGlobal('window', dom.window);
+    vi.stubGlobal('document', dom.window.document);
+    const container = dom.window.document.getElementById('root')!;
+    const root = createRoot(container);
+    function Probe() {
+      const result = useConnectedIssueProviders({ projectId: 'project' });
+      return React.createElement('span', {}, result.connectedProviders.join(','));
+    }
+    try {
+      await act(async () => root.render(withQueryClient(Probe)));
+      await act(() => new Promise((resolve) => setTimeout(resolve, 0)));
+      expect(container.textContent).toBe('openspec,todo');
+      expect(mocks.listProjectSources).toHaveBeenCalledWith({ projectId: 'project' });
+    } finally {
+      await act(async () => root.unmount());
+      dom.window.close();
+    }
+  });
 });

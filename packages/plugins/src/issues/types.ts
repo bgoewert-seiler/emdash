@@ -45,7 +45,26 @@ export type ProjectGitReader = {
   listBranches(): Promise<SourceBranch[] | null>;
   listTree(branch: SourceBranch | 'HEAD', relativePath: string): Promise<ProjectTreeEntry[] | null>;
   readTextAt(branch: SourceBranch, relativePath: string): Promise<string | null>;
+  /**
+   * `git grep -E` at a branch tip. Patterns are extended regular expressions the plugin built
+   * from escaped keywords; `pathspec` narrows the files. `null` when the branch is not current
+   * or the project is not a git repository.
+   */
+  grep(
+    branch: SourceBranch | 'HEAD',
+    patterns: string[],
+    opts?: ProjectGrepOpts
+  ): Promise<ProjectGrepResult | null>;
 };
+
+export type ProjectGrepOpts = {
+  /** Git pathspecs that narrow the files, for example a `:(glob,icase)` match on `todo.md`. */
+  pathspec?: string[];
+};
+
+export type ProjectTextHit = { path: string; line: number; text: string };
+
+export type ProjectGrepResult = { hits: ProjectTextHit[]; truncated: boolean };
 
 /**
  * Read-only view of the selected project's files, keyed by paths relative to
@@ -55,6 +74,25 @@ export type ProjectGitReader = {
 export type ProjectFilesReader = {
   listDirectories(relativePath: string): Promise<string[] | null>;
   readText(relativePath: string): Promise<string | null>;
+  /**
+   * Files whose path matches `query` in the project's path index, honoring `.gitignore` and the
+   * app's search exclusions. `null` when the index is unavailable.
+   */
+  findFiles(query: string, opts?: { limit?: number }): Promise<string[] | null>;
+  /**
+   * Lines containing `query` as a fixed, case-insensitive string, from the ripgrep content
+   * search: `.gitignore` and exclusions honored, symlinks not followed, binary files skipped.
+   * `null` when content search is unavailable on the project's host.
+   */
+  searchText(query: string, opts?: { limit?: number }): Promise<ProjectGrepResult | null>;
+};
+
+/** The TODOs source's effective settings, resolved by the host for the selected project. */
+export type TodoSourceSettings = {
+  /** Most `TODO.md` files read, in path order. */
+  fileCap: number;
+  /** Comment keywords, matched case-sensitively. */
+  keywords: string[];
 };
 
 /**
@@ -72,6 +110,8 @@ export type IssueQueryOpts = {
   projectFiles?: ProjectFilesReader;
   /** Project git access, present when the descriptor asks for it and a project is open. */
   projectGit?: ProjectGitReader;
+  /** TODOs source settings, present when the descriptor asks for them. */
+  todoSettings?: TodoSourceSettings;
 };
 
 export type IssueSearchOpts = IssueQueryOpts & {
@@ -87,6 +127,8 @@ export type IssueGetOpts = {
   projectFiles?: ProjectFilesReader;
   /** Project git access, present when the descriptor asks for it and a project is open. */
   projectGit?: ProjectGitReader;
+  /** TODOs source settings, present when the descriptor asks for them. */
+  todoSettings?: TodoSourceSettings;
 };
 
 /** Project context for deciding whether a source applies to that project at all. */

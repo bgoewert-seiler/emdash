@@ -267,6 +267,13 @@ a current ref. An issue found on a branch sets `IssueData.sourceBranch`; the lin
 keeps it, and the New Task modal uses it as the base branch unless the user picked one
 (OpenSpec changes on other branches are the first user).
 
+`ProjectFilesReader.findFiles` and `searchText` reach the file-search runtime's path index and
+ripgrep content search; they honor `.gitignore` and the app's search exclusions, never follow
+symlinks, and answer `null` when the host cannot search (no ripgrep). `ProjectGitReader.grep`
+runs the git runtime's read-only `repository.grep` at a branch tip or `HEAD` with the same
+exclusions. The TODOs source (`impl/todo`) uses both, plus `'todoSettings'`: the file cap and
+keyword list from `resolveTodoSettings()`, resolved by the host on every call.
+
 Other GitHub features first select an account through the shared resolution policy.
 Repository operations resolve against the common inventory; PR and Git operations use
 the shared project/operation resolution described above. They then call

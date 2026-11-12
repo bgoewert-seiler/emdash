@@ -10,6 +10,7 @@ import {
   getAvailableWriteFields,
   normalizeShareableFieldValue,
   projectSettingsDomainsToForm,
+  todosFormErrors,
   storedDefaultBranchToBranchRef,
   type EnvironmentFormState,
   type FileHandlingFormState,
@@ -54,6 +55,7 @@ function makeForm(overrides: FormOverrides = {}): FormState {
     },
     integrationAccounts: overrides.integrationAccounts ?? {},
     issueFilters: {},
+    todos: { fileCap: undefined, keywords: undefined },
     placement: { tmux: undefined, worktreeDirectory: '', ...overrides.placement },
   };
 }
@@ -88,6 +90,7 @@ function domains(): ProjectSettingsDomains {
     gitIdentity: { stored: { baseRemote: 'origin' } },
     integrationAccounts: { stored: {} },
     issueFilters: { stored: {} },
+    todos: { stored: {} },
     placement: {
       stored: { tmux: false },
       layers: {
@@ -119,6 +122,25 @@ describe('project settings form model', () => {
       formToProjectSettingsDomainPatch(form, new Set<FormFieldPath>(['integrationAccounts.jira']))
     ).toEqual({
       integrationAccounts: { stored: { jira: { kind: 'account', accountId: 'jira:new' } } },
+    });
+  });
+
+  it('patches TODOs overrides that were edited, and resets a cleared one to inherit', () => {
+    const form = projectSettingsDomainsToForm(
+      { ...domains(), todos: { stored: { fileCap: 5, keywords: ['TODO'] } } },
+      [origin]
+    );
+    expect(form.todos).toEqual({ fileCap: '5', keywords: 'TODO' });
+    form.todos = { fileCap: undefined, keywords: 'TODO, NOTE' };
+    expect(
+      formToProjectSettingsDomainPatch(
+        form,
+        new Set<FormFieldPath>(['todos.fileCap', 'todos.keywords'])
+      )
+    ).toEqual({ todos: { stored: { fileCap: null, keywords: ['TODO', 'NOTE'] } } });
+    expect(todosFormErrors({ fileCap: '0', keywords: 'TO DO' })).toEqual({
+      fileCap: 'Enter a whole number from 1 to 100.',
+      keywords: expect.stringContaining('TO DO'),
     });
   });
 

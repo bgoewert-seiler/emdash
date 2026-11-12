@@ -11,6 +11,7 @@ import {
 import type { CheckoutId, RepositoryIdentity } from '#runtimes/git/node/allocation/identity';
 import type { CheckoutResource } from '#runtimes/git/node/checkout/checkout-resource';
 import type { GitOperationContext } from '#runtimes/git/node/exec/operation-context';
+import type { GrepOptions } from '#runtimes/git/node/repository/ops/grep';
 import {
   gitMetadataWatchProfile,
   type IWatchService,
@@ -94,6 +95,11 @@ export class RepositoryResource {
   listTree(ref: string, path: string) {
     this.assertActive();
     return this.commands.listTree(ref, path);
+  }
+
+  grep(ref: string, options: GrepOptions) {
+    this.assertActive();
+    return this.commands.grep(ref, options);
   }
 
   async addRemote(context: RepositoryMutationContext<'addRemote'>) {

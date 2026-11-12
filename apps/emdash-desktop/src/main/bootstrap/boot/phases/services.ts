@@ -57,6 +57,10 @@ import {
 import { migrateGitHubJsonCredentials } from '@core/features/integrations/node/migrations/github-json-credentials';
 import { LegacyIntegrationAccountsMigration } from '@core/features/integrations/node/migrations/legacy-integration-accounts';
 import { readJiraTomlScope } from '@core/features/issues/node/jira-toml-scope';
+import {
+  createProjectFileSearch,
+  type ProjectFileSearch,
+} from '@core/features/issues/node/project-file-search';
 import { createProjectFilesReader } from '@core/features/issues/node/project-files-reader';
 import { createProjectGitReader } from '@core/features/issues/node/project-git-reader';
 import { createIssueProviderRegistry } from '@core/features/issues/node/registry';
@@ -73,6 +77,7 @@ import {
   loadStoredGitSettings,
   loadStoredIntegrationAccounts,
   loadStoredIssueFilters,
+  loadStoredTodoOverrides,
 } from '@core/features/projects/api/node/settings/effective-settings';
 import { ProjectSettingsService } from '@core/features/projects/api/node/settings/project-settings-service';
 import type { ProjectDeletionDependencies } from '@core/features/projects/node/operations/deleteProject';
@@ -111,7 +116,10 @@ import { createWorkspaceDeletionSweepKind } from '@core/features/workspaces/node
 import { WorkspaceRegistryBackfillService } from '@core/features/workspaces/node/sync/workspace-registry-backfill';
 import { WorkspaceRegistrySyncService } from '@core/features/workspaces/node/sync/workspace-registry-sync-service';
 import { startPeriodicSweep } from '@core/primitives/periodic-sweep/node/periodic-sweep';
-import { DEFAULT_AGENT_GIT_CREDENTIALS } from '@core/primitives/project-settings/api';
+import {
+  DEFAULT_AGENT_GIT_CREDENTIALS,
+  resolveTodoSettings,
+} from '@core/primitives/project-settings/api';
 import type { HostReachabilityProbe } from '@core/primitives/ssh/api';
 import { AppDbKeyValueStore } from '@core/services/app-db/node/key-value-store';
 import { createNotificationService } from '@core/services/notifications/node';
@@ -600,6 +608,29 @@ export async function bootServices(
     channels: gitCredentialServer,
     logger: log,
   });
+  const getSearchExclusions = async () => (await appSettingsService.get('files')).searchExclude;
+  // One per attached project, so its root lease survives between list and search calls.
+  const projectFileSearches = new WeakMap<object, ProjectFileSearch>();
+  const projectFileSearch = (project: {
+    host: Parameters<typeof fileSearchRuntime.acquireRoot>[1];
+    files: { root: Parameters<typeof fileSearchRuntime.acquireRoot>[0] };
+  }) => {
+    let search = projectFileSearches.get(project);
+    if (!search) {
+      search = createProjectFileSearch({
+        root: project.files.root,
+        client: async () => {
+          const runtime = await runtimes.client(project.host);
+          return runtime.success ? runtime.data.fileSearch : null;
+        },
+        acquireRoot: () => fileSearchRuntime.acquireRoot(project.files.root, project.host),
+        releaseRoot: () => fileSearchRuntime.releaseRoot(project.files.root, project.host),
+        getSearchExclusions,
+      });
+      projectFileSearches.set(project, search);
+    }
+    return search;
+  };
   const issueProviders = createIssueProviderRegistry({
     resolveProjectIntegrationAccount,
     // A filter saved in project settings overrides the repository's .jira.toml scope.
@@ -613,7 +644,18 @@ export async function bootServices(
     },
     resolveProjectFiles: (projectId) => {
       const attached = projectManager.requireAttached(projectId);
-      return attached.success ? createProjectFilesReader(attached.data.files) : undefined;
+      return attached.success
+        ? createProjectFilesReader(attached.data.files, projectFileSearch(attached.data))
+        : undefined;
+    },
+    // Read on every call, so a saved change applies to the next listing.
+    resolveTodoSettings: async (projectId) => {
+      const [project, app] = await Promise.all([
+        loadStoredTodoOverrides(db, projectId).catch(() => ({})),
+        appSettingsService.get('todos'),
+      ]);
+      const effective = resolveTodoSettings({ project, app });
+      return { fileCap: effective.fileCap.value, keywords: effective.keywords.value };
     },
     resolveProjectGit: (projectId) => {
       const attached = projectManager.requireAttached(projectId);
@@ -624,6 +666,7 @@ export async function bootServices(
         repository: project.repository,
         hasRepository: project.hasRepository,
         getBaseRemote: () => project.gitRepository.getBaseRemote(),
+        getSearchExclusions,
       });
     },
   });
