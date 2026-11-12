@@ -251,17 +251,23 @@ function identifierOf(item: Pick<TodoItem, 'kind' | 'path' | 'line' | 'branch'>)
   return `${item.kind}${branch}:${item.path}:${item.line}`;
 }
 
+function fileName(path: string): string {
+  return path.split('/').at(-1) ?? path;
+}
+
 function fallbackTitle(item: TodoItem): string {
-  const name = item.path.split('/').at(-1) ?? item.path;
+  const name = fileName(item.path);
   return item.kind === 'md' ? `Checklist item in ${name}` : `${item.keyword} in ${name}`;
 }
 
 function toIssueData(item: TodoItem): IssueData {
   const location = `${item.path}:${item.line}`;
+  // The row has room for the title or a full path, not both; the description keeps the path.
+  const shortLocation = `${fileName(item.path)}:${item.line}`;
   const label = item.branch ? branchLabel(item.branch) : undefined;
   return {
     identifier: identifierOf(item),
-    displayIdentifier: label ? `${label} · ${location}` : location,
+    displayIdentifier: label ? `${label} · ${shortLocation}` : shortLocation,
     title: item.title || fallbackTitle(item),
     description:
       item.kind === 'md' ? `Checklist item in ${location}` : `${item.keyword} in ${location}`,

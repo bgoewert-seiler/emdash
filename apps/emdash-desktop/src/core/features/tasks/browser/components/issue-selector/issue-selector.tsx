@@ -103,7 +103,7 @@ export function IssueRow({ issue, linkedTo }: { issue: LinkedIssue; linkedTo?: L
           {linkedTo ? <LinkedIssueIndicator linkedTo={linkedTo} /> : null}
         </span>
       </div>
-      <IssueIdentifier issue={issue} />
+      <IssueIdentifier issue={issue} className="max-w-[45%] min-w-0 shrink truncate" />
     </span>
   );
 }
