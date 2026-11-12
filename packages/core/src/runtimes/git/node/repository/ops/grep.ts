@@ -19,32 +19,36 @@ export type GrepOptions = {
 };
 
 /**
- * `git grep` over the tracked content of `ref`, as argv only: `--end-of-options` keeps a ref
+ * `git grep` over the tracked content of `ref`, or over the working tree (untracked files
+ * included, ignored ones not) when `ref` is `null`; that needs an exec bound to a checkout.
+ * Argv only: `--end-of-options` keeps a ref
  * that starts with `-` from reading as an option, and every pattern follows its own `-e`.
  * `-I` skips binary files and `--null` keeps paths with `:` parseable. Exit code 1 means no
  * match. Output past the byte cap stops the process and reports `truncated`.
  */
 export async function grep(
   exec: BoundExec,
-  ref: string,
+  ref: string | null,
   options: GrepOptions
 ): Promise<Result<GrepResult, GitCommandError>> {
   const policy = new ExclusionPolicy(options.exclusions ?? []);
+  const worktree = ref === null;
   const args = [
     'grep',
     '-n',
     '-I',
     '--null',
     '-E',
+    ...(worktree ? ['--untracked', '--exclude-standard'] : []),
     ...options.patterns.flatMap((pattern) => ['-e', pattern]),
     '--end-of-options',
-    ref,
+    ...(ref === null ? [] : [ref]),
     '--',
     ...(options.pathspec ?? []),
     ...policy.ripgrepGlobs().map((glob) => `:(exclude,glob)${glob.replace(/^!/, '')}`),
   ];
   const maxBytes = options.maxOutputBytes ?? GREP_MAX_OUTPUT_BYTES;
-  const parser = new GrepOutputParser(`${ref}:`);
+  const parser = new GrepOutputParser(ref === null ? '' : `${ref}:`);
   let bytes = 0;
   let truncated = false;
   try {
@@ -75,7 +79,7 @@ export async function grep(
   return ok({ hits, truncated });
 }
 
-/** Reads `<ref>:<path>\0<line>\0<text>\n` records; a partial record at the end is dropped. */
+/** Reads `[<ref>:]<path>\0<line>\0<text>\n` records; a partial record at the end is dropped. */
 class GrepOutputParser {
   readonly hits: GrepHit[] = [];
   private buffer = '';

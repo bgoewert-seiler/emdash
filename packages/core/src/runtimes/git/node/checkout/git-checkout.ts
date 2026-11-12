@@ -21,6 +21,7 @@ import {
   type GitFileContentState,
   type GitLogOptions,
   type GitLogResult,
+  type GrepResult,
   type PullError,
   type PushError,
   type PushOptions,
@@ -40,6 +41,7 @@ import { computeStatusState } from '#runtimes/git/node/checkout/ops/status';
 import { pushFailed } from '#runtimes/git/node/exec/errors';
 import type { GitOperationContext } from '#runtimes/git/node/exec/operation-context';
 import { execGitWithProgress } from '#runtimes/git/node/exec/transfer-progress';
+import { grep, type GrepOptions } from '#runtimes/git/node/repository/ops/grep';
 import type { BoundExec } from '#services/exec/api';
 import { checkoutFailures, InvalidCheckoutPathError } from './errors';
 
@@ -249,6 +251,10 @@ export class GitCheckout {
     const result = await readGitBlobDownload(this.exec, this.toRelativePath(key.path), key.source);
     if (!result.success) return result;
     return ok({ meta: result.data.meta, source: blobSourceFromBytes(result.data.bytes) });
+  }
+
+  grep(options: GrepOptions): Promise<Result<GrepResult, GitCommandError>> {
+    return grep(this.exec, null, options);
   }
 
   async getLog(options: GitLogOptions = {}): Promise<GitLogResult> {

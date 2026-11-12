@@ -9,6 +9,7 @@ export function createCheckoutProcedures(runtime: GitCheckoutRuntime) {
     getChangedFiles: (input) => runtime.getChangedFiles(input),
     getFile: (input) => runtime.getFile(input),
     download: (input) => runtime.download(input),
+    grep: (input) => runtime.grep(input),
     getLog: (input) => runtime.getLog(input),
     getCommit: (input) => runtime.getCommit(input),
     getCommitFiles: (input) => runtime.getCommitFiles(input),

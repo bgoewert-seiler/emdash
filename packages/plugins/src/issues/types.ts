@@ -55,6 +55,12 @@ export type ProjectGitReader = {
     patterns: string[],
     opts?: ProjectGrepOpts
   ): Promise<ProjectGrepResult | null>;
+  /**
+   * `git grep -E` over the project's files on disk, uncommitted changes and untracked files
+   * included, `.gitignore` and the app's search exclusions honored, symlinks not followed.
+   * `null` when the project is not a git repository.
+   */
+  grepWorkingTree(patterns: string[], opts?: ProjectGrepOpts): Promise<ProjectGrepResult | null>;
 };
 
 export type ProjectGrepOpts = {
@@ -79,12 +85,6 @@ export type ProjectFilesReader = {
    * app's search exclusions. `null` when the index is unavailable.
    */
   findFiles(query: string, opts?: { limit?: number }): Promise<string[] | null>;
-  /**
-   * Lines containing `query` as a fixed, case-insensitive string, from the ripgrep content
-   * search: `.gitignore` and exclusions honored, symlinks not followed, binary files skipped.
-   * `null` when content search is unavailable on the project's host.
-   */
-  searchText(query: string, opts?: { limit?: number }): Promise<ProjectGrepResult | null>;
 };
 
 /** The TODOs source's effective settings, resolved by the host for the selected project. */

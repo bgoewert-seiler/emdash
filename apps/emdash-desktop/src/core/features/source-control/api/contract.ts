@@ -135,6 +135,10 @@ const sourceControlCheckoutContract = defineContract({
     meta: checkout.download.meta,
     error: runtimeResolveErrorUnion(checkout.download.error),
   }),
+  grep: runtimeFallibleProcedure(
+    checkout.grep.input.omit({ checkout: true }).extend(workspaceKeySchema.shape),
+    checkout.grep.output
+  ),
   getLog: runtimeFallibleProcedure(
     checkout.getLog.input.omit({ checkout: true }).extend(workspaceKeySchema.shape),
     checkout.getLog.output

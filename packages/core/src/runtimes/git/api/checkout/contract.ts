@@ -18,6 +18,7 @@ import {
   pullErrorSchema,
   pushErrorSchema,
 } from '#runtimes/git/api/errors';
+import { grepResultSchema, worktreeGrepInputSchema } from '#runtimes/git/api/repository/schemas';
 import { transferProgressSchema } from '#runtimes/git/api/schemas';
 import { checkoutSelectorSchema } from '#runtimes/git/api/selectors';
 import { gitFileContentKeySchema } from './file-content-key';
@@ -93,6 +94,12 @@ export const gitCheckoutContract = defineContract({
     input: gitFileContentKeySchema,
     meta: downloadMetaSchema,
     error: downloadErrorSchema,
+  }),
+  /** Read-only `git grep` over the checkout's files on disk, untracked files included. */
+  grep: fallible({
+    input: worktreeGrepInputSchema,
+    data: grepResultSchema,
+    error: gitCommandErrorSchema,
   }),
   getLog: fallible({
     input: checkoutSelectorSchema.extend({ options: gitLogOptionsSchema.optional() }),

@@ -114,6 +114,10 @@ export function createSourceControlWireController(
         if (!result.success) return result;
         return ok({ meta: result.data.meta, source: result.data.chunks() });
       },
+      grep: (input, meta) =>
+        withCheckoutRuntime(options, input, (git, mapped) =>
+          git.checkout.grep(mapped, callOptions(meta))
+        ),
       getLog: (input, meta) =>
         withCheckoutRuntime(options, input, (git, mapped) =>
           git.checkout.getLog(mapped, callOptions(meta))

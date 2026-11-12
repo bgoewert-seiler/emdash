@@ -39,7 +39,7 @@ function setup(hasRepository = true) {
       listTree,
       grep,
     },
-    checkout: { getFile },
+    checkout: { getFile, grep },
   } as unknown as GitRuntimeClient;
   const repository = { repository: { root: '/', segments: ['repo'] } } as never;
   const reader = createProjectGitReader({
@@ -115,8 +115,24 @@ describe('createProjectGitReader', () => {
     expect(grep).not.toHaveBeenCalled();
   });
 
-  it('answers null from listBranches when the project is not a git repository', async () => {
-    const { reader } = setup(false);
+  it('greps the project checkout on disk with the search exclusions', async () => {
+    const { reader, grep } = setup();
+    expect(await reader.grepWorkingTree(['TODO'])).toEqual({
+      hits: [{ path: 'src/a.ts', line: 3, text: '// TODO: x' }],
+      truncated: false,
+    });
+    expect(grep).toHaveBeenCalledWith({
+      checkout: { root: '/', segments: ['repo'] },
+      patterns: ['TODO'],
+      pathspec: [],
+      exclusions: ['node_modules'],
+    });
+  });
+
+  it('answers null when the project is not a git repository', async () => {
+    const { reader, grep } = setup(false);
     expect(await reader.listBranches()).toBeNull();
+    expect(await reader.grepWorkingTree(['TODO'])).toBeNull();
+    expect(grep).not.toHaveBeenCalled();
   });
 });

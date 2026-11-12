@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { gitFullRefSchema } from '#runtimes/git/api/repository/states/refs';
 import { gitOperationCredentialsSchema } from '#runtimes/git/api/schemas';
-import { repositorySelectorSchema } from '#runtimes/git/api/selectors';
+import { checkoutSelectorSchema, repositorySelectorSchema } from '#runtimes/git/api/selectors';
 
 /**
  * Repository subdomain schemas: the input shapes for repository-scoped jobs
@@ -78,17 +78,25 @@ const grepArgSchema = z
     message: 'Grep arguments cannot contain NUL or newline characters',
   });
 
-export const grepInputSchema = repositorySelectorSchema.extend({
-  /** A full ref, or `HEAD` of the repository's main worktree. */
-  ref: z.union([gitFullRefSchema, z.literal('HEAD')]),
+const grepQueryShape = {
   /** Extended regular expressions, matched case-sensitively; any one matching selects a line. */
   patterns: z.array(grepArgSchema).min(1).max(GREP_MAX_PATTERNS),
   /** Git pathspecs that narrow the search; the whole tree when empty. */
   pathspec: z.array(grepArgSchema).max(GREP_MAX_PATHSPECS).default([]),
   /** Search exclusion patterns (the file-search policy) applied as `:(exclude)` pathspecs. */
   exclusions: z.array(grepArgSchema).max(GREP_MAX_EXCLUSIONS).default([]),
+};
+
+export const grepInputSchema = repositorySelectorSchema.extend({
+  /** A full ref, or `HEAD` of the repository's main worktree. */
+  ref: z.union([gitFullRefSchema, z.literal('HEAD')]),
+  ...grepQueryShape,
 });
 export type GrepInput = z.infer<typeof grepInputSchema>;
+
+/** `grep` over a checkout's files on disk: tracked and untracked, ignored files left out. */
+export const worktreeGrepInputSchema = checkoutSelectorSchema.extend(grepQueryShape);
+export type WorktreeGrepInput = z.infer<typeof worktreeGrepInputSchema>;
 
 export const grepHitSchema = z.object({
   path: z.string(),

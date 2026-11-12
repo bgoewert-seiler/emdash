@@ -100,6 +100,20 @@ export function createProjectGitReader(options: ProjectGitReaderOptions): Projec
       const hits = result.data.hits.filter((hit) => safePath(hit.path) !== null);
       return { hits, truncated: result.data.truncated };
     },
+
+    async grepWorkingTree(patterns, opts = {}) {
+      if (!options.hasRepository) return null;
+      const exclusions = (await options.getSearchExclusions?.().catch(() => [])) ?? [];
+      const result = await git.checkout.grep({
+        checkout: repository.repository,
+        patterns,
+        pathspec: opts.pathspec ?? [],
+        exclusions: [...exclusions],
+      });
+      if (!result.success) return null;
+      const hits = result.data.hits.filter((hit) => safePath(hit.path) !== null);
+      return { hits, truncated: result.data.truncated };
+    },
   };
 }
 

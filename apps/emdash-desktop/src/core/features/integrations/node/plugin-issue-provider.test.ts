@@ -91,7 +91,6 @@ describe('createPluginIssueProvider', () => {
       listDirectories: vi.fn(),
       readText: vi.fn(),
       findFiles: vi.fn(),
-      searchText: vi.fn(),
     };
     const listIssues = vi.fn(async () => ok([{ identifier: 'add-thing', title: 'Add thing' }]));
     const isAvailable = vi.fn(async () => true);
