@@ -5,6 +5,7 @@ import React, { act } from 'react';
 import { createRoot, type Root } from 'react-dom/client';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceConfigState } from '@core/features/tasks/api/browser/create-task-modal/use-workspace-config';
+import type { LinkedIssue } from '@core/primitives/linked-issues/api';
 
 (
   globalThis as typeof globalThis & { IS_REACT_ACT_ENVIRONMENT?: boolean }
@@ -103,11 +104,13 @@ function Probe({
   isUnborn = false,
   hasRepository = true,
   pr = null,
+  linkedIssue = null,
 }: {
   initial: Parameters<typeof useWorkspaceConfig>[0]['initial'];
   isUnborn?: boolean;
   hasRepository?: boolean;
   pr?: Parameters<typeof useWorkspaceConfig>[0]['pr'];
+  linkedIssue?: LinkedIssue | null;
 }) {
   latestState = useWorkspaceConfig({
     projectId: 'project-1',
@@ -118,7 +121,7 @@ function Probe({
     repositoryWorkspaceId: 'repo-workspace-1',
     pr,
     taskName: 'Generated task branch',
-    linkedIssue: null,
+    linkedIssue,
     createBranchAndWorktreeDefault: true,
     resetKey: 'project-1',
     initial,
@@ -162,12 +165,81 @@ describe('useWorkspaceConfig branch selection', () => {
       isUnborn?: boolean;
       hasRepository?: boolean;
       pr?: Parameters<typeof useWorkspaceConfig>[0]['pr'];
+      linkedIssue?: LinkedIssue | null;
     } = {}
   ) {
     await act(async () => {
       root.render(React.createElement(Probe, { initial, ...options }));
     });
   }
+
+  describe('linked issue source branch', () => {
+    const change = (sourceBranch?: GitBranchRef): LinkedIssue => ({
+      provider: 'openspec',
+      identifier: 'add-thing@feature/x',
+      title: 'Add thing',
+      url: '',
+      ...(sourceBranch ? { sourceBranch } : {}),
+    });
+    const featureX: GitBranchRef = { type: 'local', branch: 'feature/x' };
+
+    it('starts the worktree from the linked change branch', async () => {
+      await renderProbe(undefined, { linkedIssue: change(featureX) });
+      expect(latestState?.branchSelection.selectedBranch).toEqual(featureX);
+      expect(latestState?.resolvedConfig.git).toMatchObject({ fromBranch: featureX });
+      expect(latestState?.issueBranchNotice).toBeNull();
+    });
+
+    it('uses a remote-tracking source branch as a remote base branch', async () => {
+      const remote: GitBranchRef = {
+        type: 'remote',
+        branch: 'feature/x',
+        remote: { name: 'origin', url: 'https://github.com/acme/repo.git' },
+      };
+      await renderProbe(undefined, { linkedIssue: change(remote) });
+      expect(latestState?.branchSelection.selectedBranch).toEqual(remote);
+    });
+
+    it('leaves the base branch alone for an issue without a source branch', async () => {
+      await renderProbe(undefined, { linkedIssue: change() });
+      expect(latestState?.branchSelection.selectedBranch).toEqual({
+        type: 'local',
+        branch: 'main',
+      });
+    });
+
+    it('keeps a branch the user picked by hand', async () => {
+      await renderProbe(undefined);
+      act(() =>
+        latestState?.branchSelection.setSelectedBranch({ type: 'local', branch: 'release/2' })
+      );
+      await renderProbe(undefined, { linkedIssue: change(featureX) });
+      expect(latestState?.branchSelection.selectedBranch).toEqual({
+        type: 'local',
+        branch: 'release/2',
+      });
+    });
+
+    it('restores the earlier base branch when the issue is unlinked', async () => {
+      await renderProbe(undefined, { linkedIssue: change(featureX) });
+      await renderProbe(undefined, { linkedIssue: null });
+      expect(latestState?.branchSelection.selectedBranch).toEqual({
+        type: 'local',
+        branch: 'main',
+      });
+    });
+
+    it('explains that a task without a new worktree runs on the current branch', async () => {
+      await renderProbe(
+        { mode: 'existing', presetId: 'repo-root' },
+        { linkedIssue: change(featureX) }
+      );
+      expect(latestState?.issueBranchNotice).toEqual({
+        sourceBranch: 'feature/x',
+        runsOn: 'current-branch',
+      });
+    });
+  });
 
   it('uses the current branch when checkout mode is selected without an explicit branch', async () => {
     await renderProbe(undefined);

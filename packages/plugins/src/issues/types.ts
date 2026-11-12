@@ -17,6 +17,34 @@ export type IssueData = {
   assignees?: string[];
   project?: string;
   updatedAt?: string;
+  /** The branch the issue's work lives on, when it is not the checked-out working tree. */
+  sourceBranch?: IssueSourceBranch;
+};
+
+/** A git branch, shaped like the git runtime's branch ref so the host can use it as a base branch. */
+export type IssueSourceBranch =
+  | { type: 'local'; branch: string }
+  | { type: 'remote'; branch: string; remote: { name: string; url: string } };
+
+/** A branch the host found in the project repository, with its tip commit. */
+export type SourceBranch = IssueSourceBranch & {
+  oid: string;
+  /** The base remote's default branch, local or remote-tracking. */
+  isDefault: boolean;
+};
+
+export type ProjectTreeEntry = { name: string; kind: 'tree' | 'blob'; oid: string };
+
+/**
+ * Read-only git view of the selected project. Plugins pass back branch objects from
+ * `listBranches`, never ref strings; the host rejects branches that are not current refs.
+ * `listTree('HEAD', …)` reads the checked-out commit. Missing entries read as `null`.
+ */
+export type ProjectGitReader = {
+  /** Local and remote-tracking branches; `null` when the project is not a git repository. */
+  listBranches(): Promise<SourceBranch[] | null>;
+  listTree(branch: SourceBranch | 'HEAD', relativePath: string): Promise<ProjectTreeEntry[] | null>;
+  readTextAt(branch: SourceBranch, relativePath: string): Promise<string | null>;
 };
 
 /**
@@ -42,6 +70,8 @@ export type IssueQueryOpts = {
   issueFilter?: string;
   /** Project file access, present when the descriptor requires it. */
   projectFiles?: ProjectFilesReader;
+  /** Project git access, present when the descriptor asks for it and a project is open. */
+  projectGit?: ProjectGitReader;
 };
 
 export type IssueSearchOpts = IssueQueryOpts & {
@@ -55,6 +85,8 @@ export type IssueGetOpts = {
   repositoryUrl?: string;
   /** Project file access, present when the descriptor requires it. */
   projectFiles?: ProjectFilesReader;
+  /** Project git access, present when the descriptor asks for it and a project is open. */
+  projectGit?: ProjectGitReader;
 };
 
 /** Project context for deciding whether a source applies to that project at all. */

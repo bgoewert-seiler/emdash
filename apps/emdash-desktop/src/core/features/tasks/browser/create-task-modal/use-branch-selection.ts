@@ -16,7 +16,9 @@ export function useBranchSelection(
   currentBranchName: string | null,
   isUnborn: boolean,
   initial?: BranchSelectionInitial,
-  createBranchAndWorktreeByDefault = true
+  createBranchAndWorktreeByDefault = true,
+  /** The linked issue's source branch; derived, so unlinking falls back with no extra state. */
+  issueBranch?: GitBranchRef
 ) {
   const { value: project } = useAppSettingsKey('project');
   const pushOnCreateByDefault = project?.pushOnCreate ?? true;
@@ -53,7 +55,7 @@ export function useBranchSelection(
   const selectedBranch: GitBranchRef | undefined =
     branchOverride !== undefined && branchOverride.projectId === selectedProjectId
       ? branchOverride.branch
-      : fallbackBranch;
+      : ((createBranchAndWorktree ? issueBranch : undefined) ?? fallbackBranch);
 
   const setSelectedBranch = useCallback(
     (branch: GitBranchRef | undefined) => {

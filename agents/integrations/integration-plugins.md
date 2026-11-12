@@ -255,6 +255,18 @@ validates the resource against its credential endpoint before requests. Project
 disable/dangling-pin states and stale account-context checks fail closed. A linked issue
 retains its captured source account when the project's preferred account changes.
 
+Local sources read the open project instead of an API. `requiredInputs: ['projectFiles']`
+passes a `ProjectFilesReader` over the project root's working tree
+(`src/core/features/issues/node/project-files-reader.ts`), and `'projectGit'` passes a
+read-only `ProjectGitReader` over its local and remote-tracking branches
+(`src/core/features/issues/node/project-git-reader.ts`, backed by the git runtime's
+`repository.listTree` and `checkout.getFile`). `projectGit` is best effort: the host passes it
+whenever a project is open and never fails a call without it. Plugins hand back branch
+objects from `listBranches`, never ref strings, and the host rejects any branch that is not
+a current ref. An issue found on a branch sets `IssueData.sourceBranch`; the linked issue
+keeps it, and the New Task modal uses it as the base branch unless the user picked one
+(OpenSpec changes on other branches are the first user).
+
 Other GitHub features first select an account through the shared resolution policy.
 Repository operations resolve against the common inventory; PR and Git operations use
 the shared project/operation resolution described above. They then call

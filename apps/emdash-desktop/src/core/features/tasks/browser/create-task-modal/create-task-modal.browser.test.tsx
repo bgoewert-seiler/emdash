@@ -15,6 +15,7 @@ const mocks = vi.hoisted(() => ({
   select: vi.fn(),
   list: vi.fn(),
   missingBranch: false,
+  issueBranchNotice: null as { sourceBranch: string; runsOn: string | null } | null,
 }));
 const repositoryUrl = 'https://gitlab.com/group/nested/repo';
 const mr = {
@@ -61,7 +62,10 @@ vi.mock('./use-create-task-state', async () => {
       const [linkedType, setLinkedType] = useState<string | null>(null);
       const [linkedPR, setLinkedPR] = useState(null);
       return {
-        workspaceConfig: { missingBranch: mocks.missingBranch },
+        workspaceConfig: {
+          missingBranch: mocks.missingBranch,
+          issueBranchNotice: mocks.issueBranchNotice,
+        },
         linkedType,
         setLinkedType,
         linkedPR,
@@ -154,6 +158,7 @@ beforeEach(() => {
   mocks.provider = 'gitlab';
   mocks.supported = true;
   mocks.missingBranch = false;
+  mocks.issueBranchNotice = null;
   mocks.list.mockResolvedValue({ success: true, data: { prs: [mr] } });
   host = document.createElement('div');
   document.body.appendChild(host);
@@ -225,4 +230,15 @@ it('leaves Create without a reason when a branch is selected', async () => {
   await render();
   const create = page.getByRole('button', { name: 'Create', exact: true });
   await expect.element(create).not.toHaveAttribute('title');
+});
+it('names the source branch when the task will not start from it', async () => {
+  mocks.issueBranchNotice = { sourceBranch: 'feature/x', runsOn: 'main' };
+  await render();
+  await expect
+    .element(page.getByRole('status'))
+    .toHaveTextContent('This issue lives on feature/x, but the task will run on main.');
+});
+it('shows no source branch notice by default', async () => {
+  await render();
+  expect(host.textContent).not.toContain('This issue lives on');
 });

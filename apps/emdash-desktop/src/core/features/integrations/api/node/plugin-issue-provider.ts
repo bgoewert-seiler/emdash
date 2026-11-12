@@ -1,6 +1,10 @@
 import { parseRepositoryRef } from '@emdash/core/primitives/repository/api';
 import type { IntegrationCredentials } from '@emdash/plugins/integrations';
-import type { IssuesPluginProvider, ProjectFilesReader } from '@emdash/plugins/issues';
+import type {
+  IssuesPluginProvider,
+  ProjectFilesReader,
+  ProjectGitReader,
+} from '@emdash/plugins/issues';
 import { err, ok, type Result } from '@emdash/shared';
 import { log } from '@emdash/shared/logger';
 import type {
@@ -35,6 +39,7 @@ export type PluginIssueProviderDependencies = {
   /** The project's stored issue filter for a provider, if any. */
   getProjectIssueFilter?: (projectId: string, provider: string) => Promise<string | undefined>;
   resolveProjectFiles?: (projectId: string) => ProjectFilesReader | undefined;
+  resolveProjectGit?: (projectId: string) => ProjectGitReader | undefined;
 };
 
 export function createPluginIssueProvider(
@@ -44,6 +49,7 @@ export function createPluginIssueProvider(
   const provider = plugin.metadata.integrationId as IssueProviderType;
   const capabilities = toIssueProviderCapabilities(plugin);
   const pluginLog = log.child({ integration: provider });
+  const wantsProjectGit = plugin.capabilities.issues.requiredInputs.includes('projectGit');
 
   type ConnectedAccount = {
     credentials: IntegrationCredentials;
@@ -146,6 +152,11 @@ export function createPluginIssueProvider(
     return dependencies.resolveProjectFiles?.(opts.projectId);
   }
 
+  function projectGit(opts: IssueQueryOpts): ProjectGitReader | undefined {
+    if (!wantsProjectGit || !opts.projectId) return undefined;
+    return dependencies.resolveProjectGit?.(opts.projectId);
+  }
+
   function notConnectedError(): Result<never, IssueListError> {
     return err({ type: 'auth_required', message: `${provider} is not connected.` });
   }
@@ -181,6 +192,7 @@ export function createPluginIssueProvider(
         accountId: account.data.accountId,
         repositoryUrl: repositoryUrl(opts),
         projectFiles: projectFiles(opts),
+        projectGit: projectGit(opts),
         ...(issueFilter ? { issueFilter } : {}),
       });
     }),
@@ -201,6 +213,7 @@ export function createPluginIssueProvider(
               identifier: term,
               repositoryUrl: repositoryUrl(opts),
               projectFiles: projectFiles(opts),
+              projectGit: projectGit(opts),
             }
           );
           if (!result) {

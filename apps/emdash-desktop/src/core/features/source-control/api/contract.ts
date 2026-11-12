@@ -86,6 +86,10 @@ const sourceControlRepositoryContract = defineContract({
     repository.getDefaultBranch.input.omit({ repository: true }).extend(projectKeySchema.shape),
     repository.getDefaultBranch.output
   ),
+  listTree: attachmentFallibleProcedure(
+    repository.listTree.input.omit({ repository: true }).extend(projectKeySchema.shape),
+    repository.listTree.output
+  ),
   fetch: liveJob({
     input: repository.fetch.input.omit({ repository: true }).extend({
       ...projectKeySchema.shape,

@@ -30,6 +30,7 @@ import { defineModal } from '@core/primitives/modals/react';
 import { useNavigate } from '@core/primitives/navigation/browser/navigation-hooks';
 import { getNavigation } from '@core/primitives/navigation/browser/navigation-selectors';
 import { createTaskModalDefaults, type CreateTaskStrategy } from './create-task-modal-defaults';
+import { IssueBranchNotice } from './issue-branch-notice';
 import { LinkedEntitySection } from './linked-entity-section';
 import { TaskNameField } from './task-name-field';
 import { useCreateTaskCallback } from './use-create-task-callback';
@@ -152,6 +153,9 @@ export const CreateTaskModal = observer(function CreateTaskModal({
             repositoryUrl={repositoryUrl}
             projectPath={projectPath}
           />
+          {state.workspaceConfig.issueBranchNotice && (
+            <IssueBranchNotice notice={state.workspaceConfig.issueBranchNotice} />
+          )}
           <TaskStateProvider
             workspaceConfig={state.workspaceConfig}
             initialConversation={initialConversation}

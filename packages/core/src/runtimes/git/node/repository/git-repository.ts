@@ -6,6 +6,7 @@ import {
   type GitCommandError,
   type GitRefsState,
   type GitRemotesState,
+  type GitTreeEntry,
   type GitWorktreesState,
 } from '#runtimes/git/api';
 import type { RepositoryIdentity } from '#runtimes/git/node/allocation/identity';
@@ -21,6 +22,7 @@ import {
   computeRemotesState,
   remoteNameForRepositoryUrl,
 } from '#runtimes/git/node/repository/ops/remotes';
+import { listTree } from '#runtimes/git/node/repository/ops/tree';
 import { parseWorktreeList } from '#runtimes/git/node/repository/ops/worktrees';
 import { type BoundExec } from '#services/exec/api';
 import { repositoryFailures } from './errors';
@@ -61,6 +63,11 @@ export class GitRepository {
   async listWorktrees(): Promise<GitWorktreesState> {
     const { stdout } = await this.exec.exec(['worktree', 'list', '--porcelain']);
     return parseWorktreeList(stdout, toHostAbsolutePath);
+  }
+
+  /** One directory level at `ref`; `null` when the ref or the directory does not exist. */
+  listTree(ref: string, path: string): Promise<Result<GitTreeEntry[] | null, GitCommandError>> {
+    return listTree(this.exec, ref, path);
   }
 
   // -- Remotes and network ----------------------------------------------------------

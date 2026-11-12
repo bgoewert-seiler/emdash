@@ -77,6 +77,11 @@ export type WorkspaceConfigState = {
    * conflicting workspace so the UI can warn and offer a CTA.
    */
   branchConflict: ProjectWorkspaceOption | null;
+  /**
+   * The linked issue lives on a branch this task will not start from, because no new branch
+   * and worktree is being created. `runsOn` is the branch the task will use instead.
+   */
+  issueBranchNotice: { sourceBranch: string; runsOn: string | null } | null;
 };
 
 // ---------------------------------------------------------------------------
@@ -90,6 +95,11 @@ export type WorkspaceConfigState = {
 function stripRemotePrefix(name: string): string {
   const slash = name.indexOf('/');
   return slash !== -1 ? name.slice(slash + 1) : name;
+}
+
+/** `feature/x` for a local branch, `origin/feature/x` for a remote-tracking one. */
+function branchRefLabel(branch: GitBranchRef): string {
+  return branch.type === 'remote' ? `${branch.remote.name}/${branch.branch}` : branch.branch;
 }
 
 function defaultPresetForMode(mode: WorkspaceMode, hasPR: boolean): WorkspacePresetId {
@@ -256,7 +266,8 @@ export function useWorkspaceConfig(opts: {
     currentBranch,
     isUnborn,
     initial?.branchSelection,
-    createBranchAndWorktreeDefault
+    createBranchAndWorktreeDefault,
+    linkedIssue?.sourceBranch
   );
 
   const branchNameState = useBranchName({
@@ -367,6 +378,33 @@ export function useWorkspaceConfig(opts: {
     workspaceOptions,
   ]);
 
+  const issueBranchNotice = useMemo((): WorkspaceConfigState['issueBranchNotice'] => {
+    const source = linkedIssue?.sourceBranch;
+    if (!source) return null;
+    const sourceBranch = branchRefLabel(source);
+    let runsOn: string | null;
+    if (presetId === 'use-existing') {
+      runsOn =
+        workspaceOptions.find((option) => option.workspaceId === selectedWorkspaceId)?.branchName ??
+        null;
+    } else if (mode === 'existing') runsOn = currentBranch;
+    else if (!branchSelection.createBranchAndWorktree)
+      runsOn = branchSelection.selectedBranch
+        ? branchRefLabel(branchSelection.selectedBranch)
+        : null;
+    else return null;
+    return runsOn === sourceBranch ? null : { sourceBranch, runsOn };
+  }, [
+    linkedIssue?.sourceBranch,
+    mode,
+    presetId,
+    workspaceOptions,
+    selectedWorkspaceId,
+    currentBranch,
+    branchSelection.createBranchAndWorktree,
+    branchSelection.selectedBranch,
+  ]);
+
   // ── Validity ─────────────────────────────────────────────────────────────
 
   const missingBranch = presetId === 'new-worktree' && branchSelection.selectedBranch === undefined;
@@ -429,5 +467,6 @@ export function useWorkspaceConfig(opts: {
     isValid,
     missingBranch,
     branchConflict,
+    issueBranchNotice,
   };
 }

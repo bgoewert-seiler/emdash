@@ -102,7 +102,10 @@ export type {
   FetchJobInput,
   FetchPrForReviewJobInput,
   FetchPrForReviewOptions,
+  GitTreeEntry,
+  ListTreeInput,
 } from '#runtimes/git/api/repository/schemas';
+export { gitTreeEntrySchema, listTreeInputSchema } from '#runtimes/git/api/repository/schemas';
 export {
   checkoutHeadStateSchema,
   checkoutTrackingSchema,

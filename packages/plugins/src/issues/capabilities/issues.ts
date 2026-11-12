@@ -14,9 +14,10 @@ import type {
  * Host-supplied context an issues plugin needs before it can operate.
  * Repository-scoped services (GitHub, GitLab, Forgejo) need `repositoryUrl`, including its host;
  * account-scoped services (Linear, Jira, ...) need nothing; local sources (OpenSpec) read the
- * project's own files through `projectFiles`.
+ * project's own files through `projectFiles`. `projectGit` is best effort: the host passes it
+ * whenever a project is open and never fails a call for lack of it.
  */
-export const issueRequiredInputSchema = z.enum(['repositoryUrl', 'projectFiles']);
+export const issueRequiredInputSchema = z.enum(['repositoryUrl', 'projectFiles', 'projectGit']);
 
 export type IssueRequiredInput = z.infer<typeof issueRequiredInputSchema>;
 

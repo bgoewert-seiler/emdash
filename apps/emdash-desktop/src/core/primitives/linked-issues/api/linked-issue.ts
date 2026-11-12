@@ -22,6 +22,16 @@ export const issueProviderIdSchema = z.enum([
   'openspec',
 ]);
 
+/** Same shape as the git runtime's branch ref, which primitives may not import. */
+const sourceBranchSchema = z.union([
+  z.object({ type: z.literal('local'), branch: z.string() }),
+  z.object({
+    type: z.literal('remote'),
+    branch: z.string(),
+    remote: z.object({ name: z.string(), url: z.string() }),
+  }),
+]);
+
 const v0Schema = z.object({
   provider: issueProviderIdSchema,
   url: z.string(),
@@ -38,6 +48,8 @@ const v0Schema = z.object({
   project: z.string().optional(),
   updatedAt: z.string().optional(),
   fetchedAt: z.string().optional(),
+  /** Branch holding the issue's work (an OpenSpec change on a feature branch); optional, no migration. */
+  sourceBranch: sourceBranchSchema.optional(),
 });
 
 // ---------------------------------------------------------------------------

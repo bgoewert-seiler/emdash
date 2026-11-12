@@ -12,6 +12,7 @@ import {
   type GitRefsState,
   type GitRemotesState,
   type GitTransferProgress,
+  type ListTreeInput,
   type RepositorySelector,
 } from '#runtimes/git/api';
 import type { GitAllocationGraph } from '#runtimes/git/node/allocation/allocation-graph';
@@ -60,6 +61,13 @@ export class GitRepositoryRuntime {
     return this.read(input, async (repository) => ({
       branch: await repository.getDefaultBranch(input.remote),
     }));
+  }
+
+  listTree(input: ListTreeInput) {
+    return this.run(input, async (repository) => {
+      const result = await repository.listTree(input.ref, input.path);
+      return result.success ? ok({ entries: result.data }) : result;
+    });
   }
 
   fetch(input: FetchJobInput, context: LiveJobContext<GitTransferProgress>) {
