@@ -24,10 +24,10 @@ The OpenSpec issue plugin (`packages/plugins/src/issues/impl/openspec/index.ts`)
 
 ### A read-only `ProjectGitReader` plugin input
 
-Add `projectGit` to `issueRequiredInputSchema` and a `ProjectGitReader` type next to `ProjectFilesReader`:
+Add `projectGit` to `issueRequiredInputSchema` as a best-effort input (the host passes it whenever a project is open and never fails a call without it) and a `ProjectGitReader` type next to `ProjectFilesReader`:
 
-- `listBranches(): Promise<SourceBranch[] | null>` — local and remote-tracking branches with tip commit and an `isDefault` flag; `null` when the project is not a git repository.
-- `listTree(branch, relativePath): Promise<{ name, kind, oid }[] | null>`
+- `listBranches(): Promise<SourceBranch[] | null>` — local and remote-tracking branches with tip commit and an `isDefault` flag (the base remote's HEAD from the refs state, so no network call); `null` when the project is not a git repository.
+- `listTree(branch | 'HEAD', relativePath): Promise<{ name, kind, oid }[] | null>`
 - `readTextAt(branch, relativePath): Promise<string | null>`
 
 The host implementation lives in `src/core/features/issues/node/project-git-reader.ts` and is resolved like `resolveProjectFiles` in `plugin-issue-provider.ts` and `services.ts`. Plugins take a branch object from `listBranches`, never a free-form ref string. The host maps it back to the full ref (`refs/heads/x`, `refs/remotes/origin/x`) and rejects any branch not in the current ref list.

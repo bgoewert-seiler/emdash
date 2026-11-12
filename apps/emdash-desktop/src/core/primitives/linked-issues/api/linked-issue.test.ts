@@ -16,6 +16,19 @@ describe('linked issue source persistence', () => {
   it('reads old snapshots without inventing a source account', () => {
     expect(linkedIssue.parseJson(JSON.stringify(legacy))).toEqual(legacy);
   });
+  it('round-trips the branch an issue was found on', () => {
+    const current = linkedIssue.schema.parse({
+      ...legacy,
+      provider: 'openspec',
+      sourceBranch: {
+        type: 'remote',
+        branch: 'feature/x',
+        remote: { name: 'origin', url: 'git@example.com:acme/repo.git' },
+      },
+    });
+    expect(linkedIssue.parseJson(linkedIssue.serialize(current))).toEqual(current);
+    expect(linkedIssue.parseJson(JSON.stringify(legacy))?.sourceBranch).toBeUndefined();
+  });
   it('round-trips the account that supplied an issue', () => {
     const current = linkedIssue.schema.parse({ ...legacy, accountId: 'workspace-a' });
     expect(linkedIssue.parseJson(linkedIssue.serialize(current))).toEqual(current);

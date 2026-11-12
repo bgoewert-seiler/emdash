@@ -2,7 +2,12 @@ import {
   integrationPluginRegistry,
   type ConnectedIntegrationHostContext,
 } from '@emdash/plugins/integrations';
-import type { IssueDetail, IssuesPluginProvider, ProjectFilesReader } from '@emdash/plugins/issues';
+import type {
+  IssueDetail,
+  IssuesPluginProvider,
+  ProjectFilesReader,
+  ProjectGitReader,
+} from '@emdash/plugins/issues';
 import { err, ok, type Result } from '@emdash/shared';
 import type {
   IssueProviderCapabilities,
@@ -21,6 +26,7 @@ type ResolvedIssueAccess = {
   repositoryUrl?: string;
   issueFilter?: string;
   projectFiles?: ProjectFilesReader;
+  projectGit?: ProjectGitReader;
 };
 
 /** Provider adapters prepare access; list/search execution has one policy and result mapping. */
@@ -33,7 +39,7 @@ export function createIssueListOperations(
   async function invoke(opts: IssueQueryOpts, searchTerm?: string): Promise<IssueListResult> {
     const context = await prepare(opts);
     if (!context.success) return context;
-    const { repositoryUrl, projectFiles, host, issueFilter } = context.data;
+    const { repositoryUrl, projectFiles, projectGit, host, issueFilter } = context.data;
     if (capabilities.requiresRepositoryUrl && !repositoryUrl) {
       return err({ type: 'invalid_input', message: 'Repository URL is required.' });
     }
@@ -47,12 +53,14 @@ export function createIssueListOperations(
             repositoryUrl,
             issueFilter,
             projectFiles,
+            projectGit,
           })
         : await plugin.behavior.issues?.searchIssues(host, {
             limit: clampIssueProviderLimit(opts.limit, DEFAULT_SEARCH_LIMIT),
             repositoryUrl,
             issueFilter,
             projectFiles,
+            projectGit,
             searchTerm,
           });
     if (!result) return ok([]);
@@ -115,6 +123,7 @@ export function toLinkedIssue(
     assignees: issue.assignees,
     project: issue.project,
     updatedAt: issue.updatedAt,
+    sourceBranch: issue.sourceBranch,
     fetchedAt: new Date().toISOString(),
   };
 }

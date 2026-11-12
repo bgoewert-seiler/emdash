@@ -91,6 +91,11 @@ export class RepositoryResource {
     return this.commands.getDefaultBranch(remote);
   }
 
+  listTree(ref: string, path: string) {
+    this.assertActive();
+    return this.commands.listTree(ref, path);
+  }
+
   async addRemote(context: RepositoryMutationContext<'addRemote'>) {
     const result = await this.execute(() =>
       this.commands.addRemote(context.input.name, context.input.url)

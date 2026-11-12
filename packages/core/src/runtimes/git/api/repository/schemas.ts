@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { gitFullRefSchema } from '#runtimes/git/api/repository/states/refs';
 import { gitOperationCredentialsSchema } from '#runtimes/git/api/schemas';
 import { repositorySelectorSchema } from '#runtimes/git/api/selectors';
 
@@ -40,3 +41,20 @@ export const fetchPrForReviewJobInputSchema = repositorySelectorSchema.extend({
   credentials: gitOperationCredentialsSchema.optional(),
 });
 export type FetchPrForReviewJobInput = z.infer<typeof fetchPrForReviewJobInputSchema>;
+
+// -- Tree reads --
+
+export const gitTreeEntrySchema = z.object({
+  name: z.string(),
+  kind: z.enum(['tree', 'blob']),
+  oid: z.string(),
+});
+export type GitTreeEntry = z.infer<typeof gitTreeEntrySchema>;
+
+export const listTreeInputSchema = repositorySelectorSchema.extend({
+  /** A full ref, or `HEAD` of the repository's main worktree. */
+  ref: z.union([gitFullRefSchema, z.literal('HEAD')]),
+  /** Directory relative to the repository root; `''` is the root tree. */
+  path: z.string(),
+});
+export type ListTreeInput = z.infer<typeof listTreeInputSchema>;

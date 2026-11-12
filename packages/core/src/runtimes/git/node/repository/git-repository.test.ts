@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, realpath, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import type { RepositoryIdentity } from '#runtimes/git/node/allocation/identity';
 import { bindGitDir } from '#runtimes/git/node/exec/git-exec';
 import { hostPath } from '#runtimes/git/node/testing/paths';
-import { createBoundExec } from '#services/exec/api';
+import { createBoundExec, type BoundExec } from '#services/exec/api';
 import { GitRepository } from './git-repository';
 
 const execFileAsync = promisify(execFile);
@@ -334,5 +334,74 @@ describe('GitRepository', () => {
     } finally {
       await cleanup();
     }
+  });
+
+  describe('listTree', () => {
+    async function withBranchFolder() {
+      const setup = await makeRepository();
+      await git(setup.repo, ['checkout', '-b', 'feature/x']);
+      await mkdir(path.join(setup.repo, 'openspec/changes/add-thing'), { recursive: true });
+      await writeFile(path.join(setup.repo, 'openspec/changes/add-thing/proposal.md'), '# Add\n');
+      await writeFile(path.join(setup.repo, 'openspec/changes/notes.md'), 'n\n');
+      await git(setup.repo, ['add', '.']);
+      await git(setup.repo, ['commit', '-m', 'proposal']);
+      await git(setup.repo, ['checkout', 'main']);
+      return setup;
+    }
+
+    it('lists a folder that exists only on another branch', async () => {
+      const { repo, repository, cleanup } = await withBranchFolder();
+      try {
+        const result = await repository.listTree('refs/heads/feature/x', 'openspec/changes');
+        const treeOid = (
+          await git(repo, ['rev-parse', 'refs/heads/feature/x:openspec/changes/add-thing'])
+        ).trim();
+        expect(result).toEqual({
+          success: true,
+          data: [
+            { name: 'add-thing', kind: 'tree', oid: treeOid },
+            { name: 'notes.md', kind: 'blob', oid: expect.any(String) },
+          ],
+        });
+        expect(await repository.listTree('HEAD', 'openspec/changes')).toEqual({
+          success: true,
+          data: null,
+        });
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it('returns null for a missing path or ref', async () => {
+      const { repository, cleanup } = await withBranchFolder();
+      try {
+        expect(await repository.listTree('refs/heads/feature/x', 'nope')).toEqual({
+          success: true,
+          data: null,
+        });
+        expect(await repository.listTree('refs/heads/missing', 'openspec')).toEqual({
+          success: true,
+          data: null,
+        });
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it('rejects a path that escapes the repository without running git', async () => {
+      let calls = 0;
+      const exec = {
+        exec: async () => {
+          calls += 1;
+          return { stdout: '', stderr: '' };
+        },
+      } as unknown as BoundExec;
+      const repository = new GitRepository({ identity: {} as RepositoryIdentity, exec });
+      for (const bad of ['../x', '/etc', 'a/../../x']) {
+        const result = await repository.listTree('HEAD', bad);
+        expect(result.success).toBe(false);
+      }
+      expect(calls).toBe(0);
+    });
   });
 });

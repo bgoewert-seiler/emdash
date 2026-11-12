@@ -15,9 +15,13 @@ export type {
   IssueError,
   IssueGetOpts,
   IssueGetResult,
+  ProjectTreeEntry,
   IssueListResult,
   IssueQueryOpts,
   IssueSearchOpts,
+  IssueSourceBranch,
   ProjectFilesReader,
+  ProjectGitReader,
+  SourceBranch,
 } from './types';
 export type { IIssuesBehavior, IssuesDescriptor } from './capabilities/issues';
