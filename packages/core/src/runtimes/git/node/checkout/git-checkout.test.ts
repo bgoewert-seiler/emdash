@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { mkdtemp, realpath, rename, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, realpath, rename, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -570,6 +570,51 @@ describe('GitCheckout', () => {
       expect(revertResult.success).toBe(true);
       const model = okStatus(await checkout.getStatus());
       expect(model.entries).toEqual({});
+    } finally {
+      await cleanup();
+    }
+  });
+});
+
+describe('GitCheckout.grep', () => {
+  it('searches files on disk, untracked included, without ignored, excluded or linked files', async () => {
+    const { repo, checkout, cleanup } = await makeCheckout();
+    const outside = await mkdtemp(path.join(tmpdir(), 'emdash-grep-outside-'));
+    try {
+      await writeFile(path.join(outside, 'secret.ts'), '// TODO outside the project\n');
+      await writeFile(path.join(repo, '.gitignore'), 'ignored.ts\n');
+      await writeFile(path.join(repo, 'tracked.txt'), 'before\n# TODO uncommitted edit\n');
+      await writeFile(path.join(repo, 'new.ts'), '// TODO untracked file\n');
+      await writeFile(path.join(repo, 'ignored.ts'), '// TODO ignored file\n');
+      await mkdir(path.join(repo, 'node_modules/dep'), { recursive: true });
+      await writeFile(path.join(repo, 'node_modules/dep/index.js'), '// TODO vendored\n');
+      await symlink(path.join(outside, 'secret.ts'), path.join(repo, 'link.ts'));
+
+      const result = await checkout.grep({ patterns: ['TODO'], exclusions: ['node_modules'] });
+
+      expect(result).toEqual({
+        success: true,
+        data: {
+          hits: [
+            { path: 'new.ts', line: 1, text: '// TODO untracked file' },
+            { path: 'tracked.txt', line: 2, text: '# TODO uncommitted edit' },
+          ],
+          truncated: false,
+        },
+      });
+    } finally {
+      await rm(outside, { recursive: true, force: true });
+      await cleanup();
+    }
+  });
+
+  it('returns no hits when nothing matches', async () => {
+    const { checkout, cleanup } = await makeCheckout();
+    try {
+      await expect(checkout.grep({ patterns: ['FIXME'] })).resolves.toEqual({
+        success: true,
+        data: { hits: [], truncated: false },
+      });
     } finally {
       await cleanup();
     }

@@ -24,22 +24,26 @@ function linesOf(files: Files): ProjectTextHit[] {
   );
 }
 
-/** Mimics the host: path index lookup, case-insensitive fixed-string search, root reads. */
-function projectFiles(files: Files, opts: { search?: boolean } = {}): ProjectFilesReader {
+/** Mimics the host: path index lookup and root reads. */
+function projectFiles(files: Files): ProjectFilesReader {
   return {
     listDirectories: async () => null,
     readText: async (path) => files[path] ?? null,
     findFiles: async (query) =>
       Object.keys(files).filter((path) => path.toLowerCase().includes(query.toLowerCase())),
-    searchText: async (query) =>
-      opts.search === false
-        ? null
-        : {
-            hits: linesOf(files).filter((hit) =>
-              hit.text.toLowerCase().includes(query.toLowerCase())
-            ),
-            truncated: false,
-          },
+  };
+}
+
+function grepLines(files: Files, patterns: string[], pathspec?: string[]) {
+  const regexes = patterns.map((p) => new RegExp(p.replaceAll('[[:space:]]', '\\s')));
+  const onlyTodoMd = pathspec?.some((spec) => spec.includes('todo.md'));
+  return {
+    hits: linesOf(files).filter(
+      (hit) =>
+        (!onlyTodoMd || hit.path.toLowerCase().endsWith('todo.md')) &&
+        regexes.some((regex) => regex.test(hit.text))
+    ),
+    truncated: false,
   };
 }
 
@@ -63,10 +67,14 @@ function label(branch: SourceBranch | 'HEAD'): string {
   return branch.type === 'remote' ? `${branch.remote.name}/${branch.branch}` : branch.branch;
 }
 
-/** A repository whose branches hold file maps; `grep` runs the patterns as JS regexes. */
+/**
+ * A repository whose branches hold file maps; `grep` runs the patterns as JS regexes. The
+ * working tree is `head` unless given; `null` makes the working-tree grep fail.
+ */
 function projectGit(
   refs: Array<{ branch: SourceBranch; files: Files }>,
-  head: Files
+  head: Files,
+  worktree: Files | null = head
 ): ProjectGitReader {
   const filesAt = (branch: SourceBranch | 'HEAD') =>
     branch === 'HEAD' ? head : refs.find((ref) => label(ref.branch) === label(branch))?.files;
@@ -76,18 +84,18 @@ function projectGit(
     readTextAt: async (branch, path) => filesAt(branch)?.[path] ?? null,
     grep: async (branch, patterns, opts = {}) => {
       const files = filesAt(branch);
-      if (!files) return null;
-      const regexes = patterns.map((p) => new RegExp(p.replaceAll('[[:space:]]', '\\s')));
-      const onlyTodoMd = opts.pathspec?.some((spec) => spec.includes('todo.md'));
-      return {
-        hits: linesOf(files).filter(
-          (hit) =>
-            (!onlyTodoMd || hit.path.toLowerCase().endsWith('todo.md')) &&
-            regexes.some((regex) => regex.test(hit.text))
-        ),
-        truncated: false,
-      };
+      return files ? grepLines(files, patterns, opts.pathspec) : null;
     },
+    grepWorkingTree: async (patterns, opts = {}) =>
+      worktree ? grepLines(worktree, patterns, opts.pathspec) : null,
+  };
+}
+
+/** A git project with no other branches whose files on disk are `files`. */
+function workingTree(files: Files, opts: { search?: boolean } = {}) {
+  return {
+    projectFiles: projectFiles(files),
+    projectGit: projectGit([], files, opts.search === false ? null : files),
   };
 }
 
@@ -110,7 +118,7 @@ describe('TODOs issues plugin: working tree', () => {
   it('lists unchecked checklist items, then comments, by path and line, unlabeled', async () => {
     const data = await list({
       limit: 50,
-      projectFiles: projectFiles(WORKING),
+      ...workingTree(WORKING),
       todoSettings: settings,
     });
     expect(data.map((issue) => [issue.identifier, issue.title, issue.displayIdentifier])).toEqual([
@@ -130,7 +138,7 @@ describe('TODOs issues plugin: working tree', () => {
     for (let i = 10; i < 25; i += 1) files[`pkg${i}/TODO.md`] = `- [ ] item ${i}\n`;
     const data = await list({
       limit: 50,
-      projectFiles: projectFiles(files),
+      ...workingTree(files),
       todoSettings: { ...settings, fileCap: 10 },
     });
     expect(data.map((issue) => issue.title)).toEqual(
@@ -142,7 +150,7 @@ describe('TODOs issues plugin: working tree', () => {
     const many = Array.from({ length: 300 }, (_, i) => `// TODO: item ${i}`).join('\n');
     const data = await list({
       limit: 50,
-      projectFiles: projectFiles({ 'src/many.ts': many }),
+      ...workingTree({ 'src/many.ts': many }),
       todoSettings: settings,
     });
     expect(data).toHaveLength(50);
@@ -150,39 +158,39 @@ describe('TODOs issues plugin: working tree', () => {
   });
 
   it('uses the configured keywords, case-sensitively', async () => {
-    const files = projectFiles({ 'a.ts': '// todo: later\n// NOTE: x\n' });
-    expect(await list({ limit: 50, projectFiles: files, todoSettings: settings })).toEqual([]);
+    const files = workingTree({ 'a.ts': '// todo: later\n// NOTE: x\n' });
+    expect(await list({ limit: 50, ...files, todoSettings: settings })).toEqual([]);
     const custom = await list({
       limit: 50,
-      projectFiles: files,
+      ...files,
       todoSettings: { ...settings, keywords: ['todo', 'NOTE'] },
     });
     expect(custom.map((issue) => issue.title)).toEqual(['later', 'x']);
   });
 
-  it('still lists checklist items when content search is unavailable, and errors with none', async () => {
+  it('still lists checklist items when git cannot search, and errors with none', async () => {
     const data = await list({
       limit: 50,
-      projectFiles: projectFiles(WORKING, { search: false }),
+      ...workingTree(WORKING, { search: false }),
       todoSettings: settings,
     });
     expect(data.every((issue) => issue.identifier.startsWith('md:'))).toBe(true);
     const empty = await issues.listIssues(host, {
       limit: 50,
-      projectFiles: projectFiles({ 'a.ts': '// TODO: x' }, { search: false }),
+      ...workingTree({ 'a.ts': '// TODO: x' }, { search: false }),
     });
     expect(empty).toMatchObject({ success: false, error: { type: 'generic' } });
   });
 
   it('searches title, path and keyword case-insensitively', async () => {
-    const files = projectFiles({
+    const files = workingTree({
       'src/billing/charge.ts': '// TODO: retry\n',
       'src/app.ts': '// FIXME: billing totals\n// HACK: other\n',
     });
     const search = async (searchTerm: string) => {
       const result = await issues.searchIssues(host, {
         limit: 20,
-        projectFiles: files,
+        ...files,
         todoSettings: settings,
         searchTerm,
       });
@@ -326,20 +334,24 @@ describe('TODOs issues plugin: branches', () => {
     ]);
   });
 
-  it('lists only working-tree items when the project is not a git repository', async () => {
+  it('lists only TODO.md items, without an error, when the project is not a git repository', async () => {
     const git: ProjectGitReader = {
       listBranches: async () => null,
       listTree: async () => null,
       readTextAt: async () => null,
       grep: async () => null,
+      grepWorkingTree: async () => null,
     };
     const data = await list({
       limit: 50,
-      projectFiles: projectFiles(head),
+      projectFiles: projectFiles({ ...head, 'TODO.md': '- [ ] Plan\n' }),
       projectGit: git,
       todoSettings: settings,
     });
-    expect(data.map((issue) => issue.identifier)).toEqual(['code:src/a.ts:2']);
+    expect(data.map((issue) => issue.identifier)).toEqual(['md:TODO.md:1']);
+    await expect(
+      issues.listIssues(host, { limit: 50, projectFiles: projectFiles(head), projectGit: git })
+    ).resolves.toEqual({ success: true, data: [] });
   });
 
   it('searches by branch name', async () => {

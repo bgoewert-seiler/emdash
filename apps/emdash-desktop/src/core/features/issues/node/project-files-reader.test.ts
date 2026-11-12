@@ -74,79 +74,29 @@ describe('createProjectFilesReader', () => {
     expect(readText).not.toHaveBeenCalled();
   });
 
-  describe('search', () => {
-    const match = (lineNumber: number, previewText: string) => ({
-      lineNumber,
-      previewText,
-      locations: [
-        {
-          sourceRange: { startColumn: 1, endColumn: 5 },
-          previewRange: { startColumn: 1, endColumn: 5 },
-        },
-      ],
-    });
-    function search(): ProjectFileSearch & {
-      searchPaths: ReturnType<typeof vi.fn>;
-      searchContent: ReturnType<typeof vi.fn>;
-    } {
+  describe('findFiles', () => {
+    function search(): ProjectFileSearch {
       return {
         searchPaths: vi.fn(async (query: string) =>
           query === 'TODO.md' ? ['TODO.md', 'packages/api/TODO.md'] : []
         ),
-        searchContent: vi.fn(async (query: string) =>
-          query === 'TODO'
-            ? {
-                complete: true,
-                files: [
-                  { path: 'src/a.ts', matches: [match(2, '// TODO: a'), match(9, '// TODO: b')] },
-                  { path: 'src/b.ts', matches: [match(1, '# TODO c')] },
-                ],
-              }
-            : { complete: true, files: [] }
-        ),
       } as never;
     }
 
-    it('finds files and text lines through the file search', async () => {
+    it('finds files through the path index', async () => {
       const { files } = reader(search());
       await expect(files.findFiles('TODO.md')).resolves.toEqual([
         'TODO.md',
         'packages/api/TODO.md',
       ]);
-      await expect(files.searchText('TODO')).resolves.toEqual({
-        hits: [
-          { path: 'src/a.ts', line: 2, text: '// TODO: a' },
-          { path: 'src/a.ts', line: 9, text: '// TODO: b' },
-          { path: 'src/b.ts', line: 1, text: '# TODO c' },
-        ],
-        truncated: false,
-      });
-    });
-
-    it('answers empty for no match', async () => {
-      const { files } = reader(search());
       await expect(files.findFiles('nothing')).resolves.toEqual([]);
-      await expect(files.searchText('nothing')).resolves.toEqual({ hits: [], truncated: false });
     });
 
-    it('caps hits at the limit and reports truncation', async () => {
-      const fake = search();
-      const { files } = reader(fake);
-      await expect(files.searchText('TODO', { limit: 2 })).resolves.toEqual({
-        hits: [
-          { path: 'src/a.ts', line: 2, text: '// TODO: a' },
-          { path: 'src/a.ts', line: 9, text: '// TODO: b' },
-        ],
-        truncated: true,
-      });
-      expect(fake.searchContent).toHaveBeenCalledWith('TODO', 2);
-    });
-
-    it('answers null when the project has no search handle or search is unavailable', async () => {
+    it('answers null when the project has no search handle or the index is unavailable', async () => {
       await expect(reader().files.findFiles('TODO.md')).resolves.toBeNull();
-      await expect(reader().files.searchText('TODO')).resolves.toBeNull();
-      const unavailable = { searchPaths: async () => null, searchContent: async () => null };
-      await expect(reader(unavailable).files.searchText('TODO')).resolves.toBeNull();
+      await expect(
+        reader({ searchPaths: async () => null }).files.findFiles('TODO.md')
+      ).resolves.toBeNull();
     });
   });
 });

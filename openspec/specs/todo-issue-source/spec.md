@@ -88,7 +88,7 @@ Items found in the project root's working tree SHALL carry no source branch and 
 - **THEN** the item is listed with no branch label
 
 ### Requirement: Items on other branches
-The system SHALL also list `TODO.md` items and keyword comments found on every local and remote-tracking branch, each carrying the branch it was read from as its source branch. When the project is not a git repository, only the working tree SHALL be scanned.
+The system SHALL also list `TODO.md` items and keyword comments found on every local and remote-tracking branch, each carrying the branch it was read from as its source branch. When the project is not a git repository, only working-tree `TODO.md` items SHALL be listed, because comment search runs through git.
 
 #### Scenario: TODO only on a feature branch
 - **WHEN** `feature/x` has `// TODO: y` in `src/a.ts` and the checked-out branch does not
@@ -100,7 +100,7 @@ The system SHALL also list `TODO.md` items and keyword comments found on every l
 
 #### Scenario: Not a git repository
 - **WHEN** the project is not a git repository
-- **THEN** only working-tree items are listed and no error is shown
+- **THEN** only working-tree `TODO.md` items are listed and no error is shown
 
 ### Requirement: Collapse identical branch hits
 A branch hit (same path, line and text) SHALL be hidden when the same hit exists at the checked-out `HEAD`. Identical hits on several branches that differ from `HEAD` SHALL appear once, attributed to one branch in the order defined by `openspec-cross-branch-changes`: the default branch, then local branches, then remote-tracking branches, then alphabetical.

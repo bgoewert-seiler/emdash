@@ -19,6 +19,7 @@ import {
   type PullJobInput,
   type PublishJobInput,
   type PushJobInput,
+  type WorktreeGrepInput,
 } from '#runtimes/git/api';
 import type { GitAllocationGraph } from '#runtimes/git/node/allocation/allocation-graph';
 import { expectedGitCommandError } from '#runtimes/git/node/api/errors';
@@ -98,6 +99,11 @@ export class GitCheckoutRuntime {
     return this.run(input, (checkout) =>
       checkout.download({ path: input.path, source: input.source })
     );
+  }
+
+  grep(input: WorktreeGrepInput) {
+    const { checkout: _checkout, ...options } = input;
+    return this.run(input, (checkout) => checkout.grep(options));
   }
 
   getLog(input: CheckoutSelector & { options?: GitLogOptions }) {

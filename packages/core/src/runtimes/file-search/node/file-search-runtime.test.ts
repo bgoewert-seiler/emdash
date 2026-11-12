@@ -1,5 +1,4 @@
-import { execFileSync } from 'node:child_process';
-import { mkdtemp, mkdir, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, realpath, rm, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { ok } from '@emdash/shared';
@@ -84,57 +83,6 @@ describe('FileSearchRuntime', () => {
       data: { hits: [{ path: 'restored.ts', kind: 'file' }] },
     });
     expect(watcher.watchCount).toBe(0);
-  });
-});
-
-/** Content search needs a ripgrep binary; `RIPGREP_PATH` points at one when `rg` is not on PATH. */
-const ripgrepPath = process.env.RIPGREP_PATH ?? 'rg';
-const hasRipgrep = (() => {
-  try {
-    execFileSync(ripgrepPath, ['--version'], { stdio: 'ignore' });
-    return true;
-  } catch {
-    return false;
-  }
-})();
-
-describe.skipIf(!hasRipgrep)('FileSearchRuntime scan scope', () => {
-  it('skips gitignored files, excluded folders and symlinks out of the root', async () => {
-    const outside = await createRoot();
-    await writeFile(path.join(outside, 'leak.ts'), '// TODO: outside\n');
-    const rootPath = await createRoot();
-    execFileSync('git', ['init', '-q'], { cwd: rootPath });
-    await writeFile(path.join(rootPath, '.gitignore'), 'ignored.ts\n');
-    await writeFile(path.join(rootPath, 'ignored.ts'), '// TODO: ignored\n');
-    await writeFile(path.join(rootPath, 'kept.ts'), '// TODO: kept\n');
-    await mkdir(path.join(rootPath, 'node_modules'));
-    await writeFile(path.join(rootPath, 'node_modules', 'TODO.md'), '- [ ] vendored\n');
-    await writeFile(path.join(rootPath, 'TODO.md'), '- [ ] kept\n');
-    await symlink(outside, path.join(rootPath, 'linked'));
-    const handle = fileSearchStore.open(':memory:');
-    const runtime = new FileSearchRuntime({ handle, watcher: new NoopWatchService(), ripgrepPath });
-    cleanups.push(async () => {
-      await runtime.dispose();
-      handle.close();
-    });
-    const root = absolute(rootPath);
-    const lease = runtime.activeRoots.acquireState({ root }, 'status');
-    await lease.ready();
-    cleanups.push(() => lease.release());
-
-    await vi.waitFor(async () => {
-      expect(await runtime.searchPaths({ root, query: 'TODO.md', kinds: ['file'] })).toEqual({
-        success: true,
-        data: { hits: [{ path: 'TODO.md', kind: 'file' }] },
-      });
-    });
-    const content = await runtime.searchContent(
-      { root, query: 'TODO' },
-      { signal: new AbortController().signal, onProgress: () => {} }
-    );
-    expect(content.success && content.data.files.map((file) => file.path).sort()).toEqual([
-      'kept.ts',
-    ]);
   });
 });
 

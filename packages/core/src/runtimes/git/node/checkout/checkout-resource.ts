@@ -18,9 +18,11 @@ import {
   type GitCommandError,
   type GitLogOptions,
   type GitLogResult,
+  type GrepResult,
 } from '#runtimes/git/api';
 import type { CheckoutIdentity } from '#runtimes/git/node/allocation/identity';
 import type { GitOperationContext } from '#runtimes/git/node/exec/operation-context';
+import type { GrepOptions } from '#runtimes/git/node/repository/ops/grep';
 import type { RepositoryResource } from '#runtimes/git/node/repository/repository-resource';
 import type { WorktreeWatchEffects } from '#runtimes/git/node/repository/watch-classifier';
 import type { IWatchService, WatchHandle } from '#services/fs-watch/api';
@@ -125,6 +127,11 @@ export class CheckoutResource {
   ): Promise<Result<{ meta: DownloadMeta; source: BlobSource }, DownloadError>> {
     this.assertActive();
     return this.commands.download(key);
+  }
+
+  grep(options: GrepOptions): Promise<Result<GrepResult, GitCommandError>> {
+    this.assertActive();
+    return this.commands.grep(options);
   }
 
   getLog(options?: GitLogOptions): Promise<GitLogResult> {

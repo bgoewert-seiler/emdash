@@ -35,8 +35,6 @@ const DEFAULT_SETTINGS: TodoSourceSettings = {
 };
 const READ_CONCURRENCY = 8;
 const MAX_SCANNED_BRANCHES = 200;
-/** Raw ripgrep matches per keyword before classification. */
-const MAX_RAW_MATCHES_PER_KEYWORD = 5_000;
 const TODO_MD_LOOKUP_LIMIT = 200;
 const CONTEXT_LINES = 10;
 /** The host readers cap one read at 256 KiB; a file that reaches it was cut short. */
@@ -133,28 +131,24 @@ async function readWorkingChecklists(files: ProjectFilesReader, cap: number): Pr
   );
 }
 
-/** `null` when content search is unavailable on the project's host. */
+/**
+ * Comments on disk, through `git grep` so no search tool beyond git is needed. A project that is
+ * not a git repository lists none; `null` when git could not search.
+ */
 async function readWorkingComments(
-  files: ProjectFilesReader,
+  git: ProjectGitReader | undefined,
   settings: TodoSourceSettings,
   classify: CommentClassifier
 ): Promise<TodoItem[] | null> {
-  const results = await Promise.all(
-    settings.keywords.map((keyword) =>
-      files.searchText(keyword, { limit: MAX_RAW_MATCHES_PER_KEYWORD })
-    )
-  );
-  if (results.every((result) => result === null)) return null;
-  const seen = new Set<string>();
-  const items: TodoItem[] = [];
-  for (const hit of results.flatMap((result) => result?.hits ?? [])) {
-    const key = `${hit.path}\0${hit.line}`;
-    if (seen.has(key)) continue;
-    seen.add(key);
-    const item = commentItem(classify, hit);
-    if (item) items.push(item);
-  }
-  return items.sort(comparePathLine);
+  if (!git || (await git.listBranches()) === null) return [];
+  const result = await git.grepWorkingTree(keywordGrepPatterns(settings.keywords));
+  if (!result) return null;
+  return result.hits
+    .flatMap((hit) => {
+      const item = commentItem(classify, hit);
+      return item ? [item] : [];
+    })
+    .sort(comparePathLine);
 }
 
 // -- Branches -------------------------------------------------------------------------------
@@ -285,10 +279,10 @@ async function listTodoItems(
   const classify = createCommentClassifier(settings.keywords);
   const [checklists, comments, branches] = await Promise.all([
     readWorkingChecklists(files, settings.fileCap),
-    readWorkingComments(files, settings, classify),
+    readWorkingComments(opts.projectGit, settings, classify),
     readBranchItems(host, opts.projectGit, settings, classify),
   ]);
-  if (comments === null) host.log.warn('TODO comment search unavailable on this host');
+  if (comments === null) host.log.warn('TODO comment search failed');
   return {
     items: [...checklists, ...(comments ?? []), ...branches],
     commentsUnavailable: comments === null,
@@ -306,7 +300,7 @@ export async function listIssues(
     if (items.length === 0 && commentsUnavailable) {
       return err({
         type: 'generic',
-        message: 'TODO comment search is unavailable on this machine (ripgrep was not found).',
+        message: 'Unable to search the project for TODO comments.',
       });
     }
     return ok(items.slice(0, clampIssueLimit(opts.limit, 50, 500)).map(toIssueData));

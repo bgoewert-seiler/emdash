@@ -1,12 +1,6 @@
 import type { HostAbsolutePath, PortableRelativePath } from '@emdash/core/primitives/path/api';
-import type {
-  ContentSearchFileResult,
-  ContentSearchError,
-  PathSearchError,
-} from '@emdash/core/runtimes/file-search/api';
+import type { PathSearchError } from '@emdash/core/runtimes/file-search/api';
 import type { HostRuntimesClient } from '@emdash/core/services/runtime-broker/api';
-import { createLiveJobReplicaCache, LiveJobFailedError } from '@emdash/wire/live';
-import { contentSearchRuntimeContract } from '@core/features/search/api';
 
 type FileSearchClient = HostRuntimesClient['fileSearch'];
 
@@ -23,19 +17,14 @@ export type ProjectFileSearchDependencies = {
   /** Shared, ref-counted root lease (the same one open workspaces hold). */
   acquireRoot: () => Promise<void>;
   releaseRoot: () => Promise<void>;
-  getSearchExclusions: () => Promise<readonly string[]>;
   sleep?: (ms: number) => Promise<void>;
   now?: () => number;
 };
 
-export type ProjectContentSearchResult = { files: ContentSearchFileResult[]; complete: boolean };
-
-/** Path index and ripgrep content search for one project root, as issue plugins need them. */
+/** Path index lookups for one project root, as issue plugins need them. */
 export type ProjectFileSearch = {
   /** `null` when the index is unavailable. */
   searchPaths(query: string, limit: number): Promise<PortableRelativePath[] | null>;
-  /** `null` when content search is unavailable on the host (for example, no ripgrep). */
-  searchContent(query: string, limit: number): Promise<ProjectContentSearchResult | null>;
 };
 
 /**
@@ -104,43 +93,5 @@ export function createProjectFileSearch(deps: ProjectFileSearchDependencies): Pr
             : result;
         })
       ),
-
-    searchContent: (query, limit) =>
-      withRoot(async (client) => {
-        const exclusions = [...(await deps.getSearchExclusions())];
-        return retryWhileStarting<ProjectContentSearchResult, ContentSearchError>(() =>
-          runContentSearch(client, { root: deps.root, exclusions, query, limit })
-        );
-      }),
   };
-}
-
-async function runContentSearch(
-  client: FileSearchClient,
-  input: { root: HostAbsolutePath; exclusions: string[]; query: string; limit: number }
-): Promise<
-  | { success: true; data: ProjectContentSearchResult }
-  | { success: false; error: ContentSearchError }
-> {
-  const jobs = createLiveJobReplicaCache(
-    contentSearchRuntimeContract.searchContent,
-    client.searchContent
-  );
-  try {
-    const lease = await jobs.start(input);
-    try {
-      const job = await lease.ready();
-      try {
-        const result = await job.result;
-        return { success: true, data: { files: result.files, complete: result.complete } };
-      } catch (error) {
-        if (error instanceof LiveJobFailedError) return { success: false, error: error.error };
-        throw error;
-      }
-    } finally {
-      await lease.release();
-    }
-  } finally {
-    await jobs.dispose();
-  }
 }

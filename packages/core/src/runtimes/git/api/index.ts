@@ -107,12 +107,14 @@ export type {
   GrepInput,
   GrepResult,
   ListTreeInput,
+  WorktreeGrepInput,
 } from '#runtimes/git/api/repository/schemas';
 export {
   GREP_MAX_OUTPUT_BYTES,
   gitTreeEntrySchema,
   grepInputSchema,
   listTreeInputSchema,
+  worktreeGrepInputSchema,
 } from '#runtimes/git/api/repository/schemas';
 export {
   checkoutHeadStateSchema,

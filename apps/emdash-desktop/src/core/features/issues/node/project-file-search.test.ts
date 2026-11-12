@@ -12,7 +12,6 @@ function setup(results: Array<{ success: boolean; data?: unknown; error?: unknow
     client: async () => ({ searchPaths }) as never,
     acquireRoot,
     releaseRoot,
-    getSearchExclusions: async () => [],
     sleep: async (ms) => {
       clock += ms;
     },

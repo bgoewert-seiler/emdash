@@ -625,7 +625,6 @@ export async function bootServices(
         },
         acquireRoot: () => fileSearchRuntime.acquireRoot(project.files.root, project.host),
         releaseRoot: () => fileSearchRuntime.releaseRoot(project.files.root, project.host),
-        getSearchExclusions,
       });
       projectFileSearches.set(project, search);
     }
