@@ -124,6 +124,7 @@ function fixture() {
     ok({
       integrationAccounts: { stored: {} },
       issueFilters: { stored: {} },
+      todos: { stored: {} },
       gitIdentity: {
         stored: {
           baseRemote: 'origin',

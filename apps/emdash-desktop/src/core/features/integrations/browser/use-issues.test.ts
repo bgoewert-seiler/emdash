@@ -14,6 +14,11 @@ const mocks = vi.hoisted(() => ({
   searchIssues: vi.fn(),
   listAccounts: vi.fn(),
   getProjectSettingsStore: vi.fn(),
+  appTodos: { value: undefined as unknown },
+}));
+
+vi.mock('@core/features/settings/api/browser/use-app-settings-key', () => ({
+  useAppSettingsKey: () => ({ value: mocks.appTodos.value }),
 }));
 
 vi.mock('@core/features/integrations/api/browser/client', () => ({
@@ -30,8 +35,14 @@ vi.mock('@core/features/issues/api/browser/client', () => ({
   }),
 }));
 
-function Probe({ repositoryUrl = 'https://github.com/acme/repo' }: { repositoryUrl?: string }) {
-  const result = useIssues('github', {
+function Probe({
+  repositoryUrl = 'https://github.com/acme/repo',
+  provider = 'github',
+}: {
+  repositoryUrl?: string;
+  provider?: 'github' | 'todo';
+}) {
+  const result = useIssues(provider, {
     projectId: 'project-1',
     repositoryUrl,
   });
@@ -56,6 +67,7 @@ describe('useIssues', () => {
 
   beforeEach(() => {
     vi.useFakeTimers();
+    mocks.appTodos.value = undefined;
     mocks.listAccounts.mockResolvedValue({
       github: [
         { accountId: 'a', isDefault: true },
@@ -130,7 +142,7 @@ describe('useIssues', () => {
     expect(container.querySelector('[data-testid="count"]')?.textContent).toBe('0');
   });
 
-  async function renderProbe(props: { repositoryUrl?: string } = {}) {
+  async function renderProbe(props: { repositoryUrl?: string; provider?: 'github' | 'todo' } = {}) {
     await act(async () => {
       root.render(
         React.createElement(
@@ -244,5 +256,42 @@ describe('useIssues', () => {
     await renderProbe({ repositoryUrl: 'https://github.com/acme/other' });
     expect(mocks.searchIssues).toHaveBeenCalledTimes(2);
     expect(container.querySelector('[data-testid="count"]')?.textContent).toBe('0');
+  });
+
+  it('fetches TODOs again when the project overrides the TODOs settings', async () => {
+    mocks.listIssues.mockResolvedValueOnce({
+      success: true,
+      data: [{ identifier: 'md:TODO.md:1' }],
+    });
+    await renderProbe({ provider: 'todo' });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(container.querySelector('[data-testid="count"]')?.textContent).toBe('1');
+    mocks.listIssues.mockReturnValue(new Promise(() => {}));
+    mocks.getProjectSettingsStore.mockReturnValue({
+      durableDomains: {
+        integrationAccounts: { stored: {} },
+        todos: { stored: { keywords: ['FIXME'] } },
+      },
+      pageData: { error: null },
+    });
+    await renderProbe({ provider: 'todo' });
+    expect(mocks.listIssues).toHaveBeenCalledTimes(2);
+  });
+
+  it('fetches TODOs again when the app TODOs settings change', async () => {
+    mocks.listIssues.mockResolvedValueOnce({
+      success: true,
+      data: [{ identifier: 'md:TODO.md:1' }],
+    });
+    await renderProbe({ provider: 'todo' });
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(1);
+    });
+    expect(mocks.listIssues).toHaveBeenCalledTimes(1);
+    mocks.appTodos.value = { fileCap: 1, keywords: ['TODO'] };
+    await renderProbe({ provider: 'todo' });
+    expect(mocks.listIssues).toHaveBeenCalledTimes(2);
   });
 });

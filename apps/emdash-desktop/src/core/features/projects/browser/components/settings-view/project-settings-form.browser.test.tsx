@@ -11,6 +11,9 @@ vi.mock('./project-settings-footer', () => ({
 vi.mock('./sections/base-project-settings-section', () => ({
   BaseProjectSettingsSection: () => null,
 }));
+vi.mock('./sections/todos-section', () => ({
+  TodosSection: () => null,
+}));
 vi.mock('./sections/shareable-project-settings-section', () => ({
   ShareableSettingsSection: () => null,
 }));

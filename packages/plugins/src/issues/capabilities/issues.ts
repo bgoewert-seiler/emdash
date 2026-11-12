@@ -15,9 +15,15 @@ import type {
  * Repository-scoped services (GitHub, GitLab, Forgejo) need `repositoryUrl`, including its host;
  * account-scoped services (Linear, Jira, ...) need nothing; local sources (OpenSpec) read the
  * project's own files through `projectFiles`. `projectGit` is best effort: the host passes it
- * whenever a project is open and never fails a call for lack of it.
+ * whenever a project is open and never fails a call for lack of it. `todoSettings` is the TODOs
+ * source's resolved file cap and keyword list.
  */
-export const issueRequiredInputSchema = z.enum(['repositoryUrl', 'projectFiles', 'projectGit']);
+export const issueRequiredInputSchema = z.enum([
+  'repositoryUrl',
+  'projectFiles',
+  'projectGit',
+  'todoSettings',
+]);
 
 export type IssueRequiredInput = z.infer<typeof issueRequiredInputSchema>;
 

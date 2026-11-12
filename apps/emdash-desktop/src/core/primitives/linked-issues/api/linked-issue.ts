@@ -20,6 +20,7 @@ export const issueProviderIdSchema = z.enum([
   'trello',
   'youtrack',
   'openspec',
+  'todo',
 ]);
 
 /** Same shape as the git runtime's branch ref, which primitives may not import. */

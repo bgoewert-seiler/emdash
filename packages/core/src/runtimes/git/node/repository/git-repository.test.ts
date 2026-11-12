@@ -404,4 +404,123 @@ describe('GitRepository', () => {
       expect(calls).toBe(0);
     });
   });
+  describe('grep', () => {
+    async function withGrepBranch() {
+      const setup = await makeRepository();
+      await git(setup.repo, ['checkout', '-b', 'feature/x']);
+      await mkdir(path.join(setup.repo, 'src'), { recursive: true });
+      await mkdir(path.join(setup.repo, 'node_modules/dep'), { recursive: true });
+      await writeFile(
+        path.join(setup.repo, 'src/a:b.ts'),
+        'const x = 1;\n// TODO: handle -v\n',
+        'utf8'
+      );
+      await writeFile(
+        path.join(setup.repo, 'src/shell.sh'),
+        '# TODO $(touch pwned); rm -rf /\n',
+        'utf8'
+      );
+      await writeFile(path.join(setup.repo, 'node_modules/dep/index.js'), '// TODO vendored\n');
+      await writeFile(path.join(setup.repo, 'blob.bin'), Buffer.from([0, 1, 2, 84, 79, 68, 79, 0]));
+      await git(setup.repo, ['add', '-f', '.']);
+      await git(setup.repo, ['commit', '-m', 'todos']);
+      await git(setup.repo, ['checkout', 'main']);
+      return setup;
+    }
+
+    it('finds lines on another branch without checking it out', async () => {
+      const { repo, repository, cleanup } = await withGrepBranch();
+      try {
+        const result = await repository.grep('refs/heads/feature/x', {
+          patterns: ['TODO'],
+          exclusions: ['node_modules'],
+        });
+        expect(result).toEqual({
+          success: true,
+          data: {
+            hits: [
+              { path: 'src/a:b.ts', line: 2, text: '// TODO: handle -v' },
+              { path: 'src/shell.sh', line: 1, text: '# TODO $(touch pwned); rm -rf /' },
+            ],
+            truncated: false,
+          },
+        });
+        expect((await git(repo, ['branch', '--show-current'])).trim()).toBe('main');
+        expect((await git(repo, ['status', '--porcelain'])).trim()).toBe('');
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it('treats patterns that look like options or shell syntax as patterns', async () => {
+      const { repo, repository, cleanup } = await withGrepBranch();
+      try {
+        const dashed = await repository.grep('refs/heads/feature/x', { patterns: ['-v'] });
+        expect(dashed.success && dashed.data.hits.map((hit) => hit.path)).toEqual(['src/a:b.ts']);
+        const shell = await repository.grep('refs/heads/feature/x', {
+          patterns: ['\\$\\(touch pwned\\); rm'],
+        });
+        expect(shell.success && shell.data.hits.map((hit) => hit.path)).toEqual(['src/shell.sh']);
+        await expect(stat(path.join(repo, 'pwned'))).rejects.toThrow();
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it('fails a ref that is not a branch instead of running it as an option or command', async () => {
+      const { repo, repository, cleanup } = await withGrepBranch();
+      try {
+        for (const ref of ['refs/heads/--output=pwned', 'refs/heads/x;touch pwned']) {
+          const result = await repository.grep(ref, { patterns: ['TODO'] });
+          expect(result.success).toBe(false);
+        }
+        await expect(stat(path.join(repo, 'pwned'))).rejects.toThrow();
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it('returns no hits for no match and narrows by pathspec', async () => {
+      const { repository, cleanup } = await withGrepBranch();
+      try {
+        expect(await repository.grep('HEAD', { patterns: ['TODO'] })).toEqual({
+          success: true,
+          data: { hits: [], truncated: false },
+        });
+        const narrowed = await repository.grep('refs/heads/feature/x', {
+          patterns: ['TODO'],
+          pathspec: [':(glob)**/*.sh'],
+        });
+        expect(narrowed.success && narrowed.data.hits.map((hit) => hit.path)).toEqual([
+          'src/shell.sh',
+        ]);
+      } finally {
+        await cleanup();
+      }
+    });
+
+    it('stops at the output cap and reports truncation', async () => {
+      const setup = await makeRepository();
+      try {
+        const lines = Array.from({ length: 2000 }, (_, i) => `// TODO item ${i}`).join('\n');
+        await writeFile(path.join(setup.repo, 'many.ts'), `${lines}\n`);
+        await git(setup.repo, ['add', '.']);
+        await git(setup.repo, ['commit', '-m', 'many']);
+        const { grep } = await import('./ops/grep');
+        const exec = bindGitDir(
+          createBoundExec({ file: 'git', cwd: tmpdir() }),
+          path.join(setup.repo, '.git')
+        );
+        const result = await grep(exec, 'HEAD', { patterns: ['TODO'], maxOutputBytes: 4096 });
+        expect(result.success).toBe(true);
+        if (!result.success) return;
+        expect(result.data.truncated).toBe(true);
+        expect(result.data.hits.length).toBeGreaterThan(0);
+        expect(result.data.hits.length).toBeLessThan(2000);
+        expect(result.data.hits[0]).toEqual({ path: 'many.ts', line: 1, text: '// TODO item 0' });
+      } finally {
+        await setup.cleanup();
+      }
+    });
+  });
 });

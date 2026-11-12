@@ -8,6 +8,7 @@ import {
   type StoredProjectGitSettings,
   type StoredIntegrationAccounts,
   type StoredIssueFilters,
+  type StoredTodoOverrides,
 } from '@core/primitives/project-settings/api';
 import type { AppDb } from '@core/services/app-db/node/db';
 import { projectSettings } from '@core/services/app-db/node/schema';
@@ -92,6 +93,7 @@ export function storedGitSettingsFromRow(
   const {
     integrationAccounts: _accounts,
     issueFilters: _issueFilters,
+    todos: _todos,
     tmux: _tmux,
     tmuxDefaultMigrated: _migration,
     ...git
@@ -149,4 +151,16 @@ export async function loadStoredIssueFilters(
     .where(eq(projectSettings.projectId, projectId))
     .limit(1);
   return row ? (readStoredProjectSettings(row.base).issueFilters ?? {}) : {};
+}
+
+export async function loadStoredTodoOverrides(
+  db: AppDb,
+  projectId: string
+): Promise<StoredTodoOverrides> {
+  const [row] = await db
+    .select({ base: projectSettings.baseProjectSettingsJson })
+    .from(projectSettings)
+    .where(eq(projectSettings.projectId, projectId))
+    .limit(1);
+  return row ? (readStoredProjectSettings(row.base).todos ?? {}) : {};
 }

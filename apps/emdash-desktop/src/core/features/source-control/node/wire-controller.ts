@@ -73,6 +73,10 @@ export function createSourceControlWireController(
         withRepositoryRuntime(options, input, (git, mapped) =>
           git.repository.listTree(mapped, callOptions(meta))
         ),
+      grep: (input, meta) =>
+        withRepositoryRuntime(options, input, (git, mapped) =>
+          git.repository.grep(mapped, callOptions(meta))
+        ),
       fetch: job<typeof sourceControlContract.repository.fetch>((input, context) =>
         runRepositoryJob(
           options,

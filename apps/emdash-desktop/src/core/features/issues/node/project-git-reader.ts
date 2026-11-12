@@ -18,6 +18,8 @@ export type ProjectGitReaderOptions = {
   hasRepository: boolean;
   /** The project's effective base remote; its remote HEAD marks the default branch. */
   getBaseRemote: () => Promise<string | null>;
+  /** The app's search exclusions, applied to `grep` as they are to content search. */
+  getSearchExclusions?: () => Promise<readonly string[]>;
 };
 
 /**
@@ -79,6 +81,24 @@ export function createProjectGitReader(options: ProjectGitReaderOptions): Projec
       });
       if (!result.success || result.data.content === null) return null;
       return result.data.content.slice(0, MAX_READ_BYTES);
+    },
+
+    async grep(branch, patterns, opts = {}) {
+      if (!options.hasRepository) return null;
+      const ref = branch === 'HEAD' ? 'HEAD' : (await resolve(branch))?.ref;
+      if (!ref) return null;
+      const exclusions = (await options.getSearchExclusions?.().catch(() => [])) ?? [];
+      const result = await git.repository.grep({
+        ...repository,
+        ref,
+        patterns,
+        pathspec: opts.pathspec ?? [],
+        exclusions: [...exclusions],
+      });
+      if (!result.success) return null;
+      // Git output is re-validated so a crafted tree path never reaches a later read.
+      const hits = result.data.hits.filter((hit) => safePath(hit.path) !== null);
+      return { hits, truncated: result.data.truncated };
     },
   };
 }

@@ -4,6 +4,7 @@ import type {
   IssuesPluginProvider,
   ProjectFilesReader,
   ProjectGitReader,
+  TodoSourceSettings,
 } from '@emdash/plugins/issues';
 import { err, ok, type Result } from '@emdash/shared';
 import { log } from '@emdash/shared/logger';
@@ -40,6 +41,8 @@ export type PluginIssueProviderDependencies = {
   getProjectIssueFilter?: (projectId: string, provider: string) => Promise<string | undefined>;
   resolveProjectFiles?: (projectId: string) => ProjectFilesReader | undefined;
   resolveProjectGit?: (projectId: string) => ProjectGitReader | undefined;
+  /** Effective TODOs source settings for a project, read at call time. */
+  resolveTodoSettings?: (projectId: string) => Promise<TodoSourceSettings>;
 };
 
 export function createPluginIssueProvider(
@@ -50,6 +53,7 @@ export function createPluginIssueProvider(
   const capabilities = toIssueProviderCapabilities(plugin);
   const pluginLog = log.child({ integration: provider });
   const wantsProjectGit = plugin.capabilities.issues.requiredInputs.includes('projectGit');
+  const wantsTodoSettings = plugin.capabilities.issues.requiredInputs.includes('todoSettings');
 
   type ConnectedAccount = {
     credentials: IntegrationCredentials;
@@ -157,6 +161,11 @@ export function createPluginIssueProvider(
     return dependencies.resolveProjectGit?.(opts.projectId);
   }
 
+  async function todoSettings(opts: IssueQueryOpts): Promise<TodoSourceSettings | undefined> {
+    if (!wantsTodoSettings || !opts.projectId) return undefined;
+    return dependencies.resolveTodoSettings?.(opts.projectId);
+  }
+
   function notConnectedError(): Result<never, IssueListError> {
     return err({ type: 'auth_required', message: `${provider} is not connected.` });
   }
@@ -193,6 +202,7 @@ export function createPluginIssueProvider(
         repositoryUrl: repositoryUrl(opts),
         projectFiles: projectFiles(opts),
         projectGit: projectGit(opts),
+        todoSettings: await todoSettings(opts),
         ...(issueFilter ? { issueFilter } : {}),
       });
     }),
@@ -214,6 +224,7 @@ export function createPluginIssueProvider(
               repositoryUrl: repositoryUrl(opts),
               projectFiles: projectFiles(opts),
               projectGit: projectGit(opts),
+              todoSettings: await todoSettings(opts),
             }
           );
           if (!result) {

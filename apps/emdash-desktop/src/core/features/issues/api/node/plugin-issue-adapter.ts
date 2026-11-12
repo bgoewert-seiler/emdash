@@ -7,6 +7,7 @@ import type {
   IssuesPluginProvider,
   ProjectFilesReader,
   ProjectGitReader,
+  TodoSourceSettings,
 } from '@emdash/plugins/issues';
 import { err, ok, type Result } from '@emdash/shared';
 import type {
@@ -27,6 +28,7 @@ type ResolvedIssueAccess = {
   issueFilter?: string;
   projectFiles?: ProjectFilesReader;
   projectGit?: ProjectGitReader;
+  todoSettings?: TodoSourceSettings;
 };
 
 /** Provider adapters prepare access; list/search execution has one policy and result mapping. */
@@ -39,7 +41,8 @@ export function createIssueListOperations(
   async function invoke(opts: IssueQueryOpts, searchTerm?: string): Promise<IssueListResult> {
     const context = await prepare(opts);
     if (!context.success) return context;
-    const { repositoryUrl, projectFiles, projectGit, host, issueFilter } = context.data;
+    const { repositoryUrl, projectFiles, projectGit, todoSettings, host, issueFilter } =
+      context.data;
     if (capabilities.requiresRepositoryUrl && !repositoryUrl) {
       return err({ type: 'invalid_input', message: 'Repository URL is required.' });
     }
@@ -54,6 +57,7 @@ export function createIssueListOperations(
             issueFilter,
             projectFiles,
             projectGit,
+            todoSettings,
           })
         : await plugin.behavior.issues?.searchIssues(host, {
             limit: clampIssueProviderLimit(opts.limit, DEFAULT_SEARCH_LIMIT),
@@ -61,6 +65,7 @@ export function createIssueListOperations(
             issueFilter,
             projectFiles,
             projectGit,
+            todoSettings,
             searchTerm,
           });
     if (!result) return ok([]);

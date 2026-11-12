@@ -110,6 +110,45 @@ describe('DesktopProjectSettingsAuthority', () => {
     expect(JSON.parse(row.baseProjectSettingsJson)).not.toHaveProperty('issueFilters');
   });
 
+  it('patches TODOs overrides per field, resets with null and rejects invalid values', async () => {
+    const row: StoredProjectSettings = {
+      baseProjectSettingsJson: JSON.stringify({ baseRemote: 'origin' }),
+      shareableProjectSettingsJson: '{}',
+      legacyConfigMigratedAt: null,
+    };
+    const storage: ProjectSettingsStorage = {
+      get: vi.fn(async () => row),
+      insertIfMissing: vi.fn(),
+      mutate: vi.fn(async (_projectId, patch) => {
+        Object.assign(row, patch(row));
+        return row;
+      }),
+    };
+    const authority = new DesktopProjectSettingsAuthority(storage);
+    const todos = async () => {
+      const read = await authority.read('project-1');
+      return read.success ? read.data.todos.stored : null;
+    };
+
+    await authority.patch('project-1', { todos: { stored: { fileCap: 5 } } });
+    await authority.patch('project-1', { todos: { stored: { keywords: ['TODO', 'NOTE'] } } });
+    await expect(todos()).resolves.toEqual({ fileCap: 5, keywords: ['TODO', 'NOTE'] });
+
+    await authority.patch('project-1', { todos: { stored: { fileCap: null } } });
+    await expect(todos()).resolves.toEqual({ keywords: ['TODO', 'NOTE'] });
+
+    await expect(
+      authority.patch('project-1', { todos: { stored: { fileCap: 101 } } })
+    ).resolves.toMatchObject({ success: false });
+    await expect(
+      authority.patch('project-1', { todos: { stored: { keywords: ['.*'] } } })
+    ).resolves.toMatchObject({ success: false });
+    await expect(todos()).resolves.toEqual({ keywords: ['TODO', 'NOTE'] });
+
+    await authority.patch('project-1', { todos: { stored: { keywords: null } } });
+    expect(JSON.parse(row.baseProjectSettingsJson)).toEqual({ baseRemote: 'origin' });
+  });
+
   it('preserves lifecycle migration sources during a durable patch', async () => {
     const shareable = JSON.stringify({
       preservePatterns: ['.env.local'],

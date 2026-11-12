@@ -1,6 +1,7 @@
 import type { EmdashConfig } from '@emdash/core/primitives/emdash-config/api';
 import type { Result } from '@emdash/shared';
 import z from 'zod';
+import { storedTodoOverridesSchema } from './todo-settings';
 
 export const defaultBranchSettingSchema = z.union([
   z.string(),
@@ -69,6 +70,8 @@ export const storedBaseProjectSettingsSchema = z.object({
   pushRemote: z.string().optional(),
   integrationAccounts: storedIntegrationAccountsSchema.optional(),
   issueFilters: storedIssueFiltersSchema.optional(),
+  /** TODOs source overrides; invalid fields drop on read instead of failing the row. */
+  todos: storedTodoOverridesSchema.optional().catch(undefined),
   agentGitCredentials: agentGitCredentialsSettingSchema.optional(),
   tmux: z.boolean().optional(),
   /** Lazy-migration marker; not a user setting. */

@@ -103,9 +103,17 @@ export type {
   FetchPrForReviewJobInput,
   FetchPrForReviewOptions,
   GitTreeEntry,
+  GrepHit,
+  GrepInput,
+  GrepResult,
   ListTreeInput,
 } from '#runtimes/git/api/repository/schemas';
-export { gitTreeEntrySchema, listTreeInputSchema } from '#runtimes/git/api/repository/schemas';
+export {
+  GREP_MAX_OUTPUT_BYTES,
+  gitTreeEntrySchema,
+  grepInputSchema,
+  listTreeInputSchema,
+} from '#runtimes/git/api/repository/schemas';
 export {
   checkoutHeadStateSchema,
   checkoutTrackingSchema,

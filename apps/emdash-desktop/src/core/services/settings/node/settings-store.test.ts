@@ -67,6 +67,26 @@ async function roundTripDefault<K extends AppSettingsKey>(key: K): Promise<void>
 }
 
 describe('SettingsStore contributions', () => {
+  it('saves and loads the TODOs settings, falling back to defaults for an invalid stored value', async () => {
+    rows.clear();
+    const settings = new SettingsStore(db, appSettingsContributions);
+    expect(await settings.get('todos')).toEqual({
+      fileCap: 10,
+      keywords: ['TODO', 'FIXME', 'HACK', 'XXX'],
+    });
+    await settings.update('todos', { fileCap: 20, keywords: ['TODO', 'NOTE'] });
+    expect(await new SettingsStore(db, appSettingsContributions).get('todos')).toEqual({
+      fileCap: 20,
+      keywords: ['TODO', 'NOTE'],
+    });
+    await expect(settings.update('todos', { fileCap: 0, keywords: ['TODO'] })).rejects.toThrow();
+    rows.set('todos', JSON.stringify({ fileCap: 20, keywords: ['.*'] }));
+    expect(await new SettingsStore(db, appSettingsContributions).get('todos')).toEqual({
+      fileCap: 10,
+      keywords: ['TODO', 'FIXME', 'HACK', 'XXX'],
+    });
+  });
+
   it('remembers the last conversation interface globally across restarts', async () => {
     rows.clear();
     const settings = new SettingsStore(db, appSettingsContributions);

@@ -9,6 +9,7 @@ describe('issue plugin registry', () => {
 
     expect(new Set(integrationIds).size).toBe(integrationIds.length);
     expect(new Set(issueIntegrationIds).size).toBe(issueIntegrationIds.length);
+    expect(issueIntegrationIds).toEqual(expect.arrayContaining(['openspec', 'todo']));
 
     for (const integrationId of issueIntegrationIds) {
       expect(integrationPluginRegistry.get(integrationId)).toBeDefined();

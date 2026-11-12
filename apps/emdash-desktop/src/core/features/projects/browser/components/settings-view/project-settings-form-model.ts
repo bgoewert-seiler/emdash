@@ -1,5 +1,10 @@
 import type { GitBranchRef } from '@emdash/core/runtimes/git/api';
-import { DEFAULT_AGENT_GIT_CREDENTIALS } from '@core/primitives/project-settings/api';
+import {
+  DEFAULT_AGENT_GIT_CREDENTIALS,
+  formatTodoKeywords,
+  parseTodoFileCapInput,
+  parseTodoKeywordsInput,
+} from '@core/primitives/project-settings/api';
 import type {
   AgentGitCredentialsSetting,
   ShareableProjectSettingsWriteField,
@@ -16,6 +21,7 @@ import type {
   ProjectPlacementDomainSnapshot,
   ProjectSettingsDomainPatch,
   ProjectSettingsDomains,
+  ProjectTodosDomainSnapshot,
 } from '../../../api/project-settings-page';
 import {
   SHAREABLE_FIELD_DESCRIPTOR_BY_ID,
@@ -68,6 +74,12 @@ export type PlacementFormState = {
   worktreeDirectory: string;
 };
 
+/** TODOs overrides as typed; undefined inherits the app setting. */
+export type TodosFormState = {
+  fileCap: string | undefined;
+  keywords: string | undefined;
+};
+
 export type FormState = {
   lifecycle: LifecycleFormState;
   fileHandling: FileHandlingFormState;
@@ -75,6 +87,7 @@ export type FormState = {
   gitIdentity: GitIdentityFormState;
   integrationAccounts: IntegrationAccountsFormState;
   issueFilters: IssueFiltersFormState;
+  todos: TodosFormState;
   placement: PlacementFormState;
 };
 
@@ -154,6 +167,41 @@ export function placementToForm(domain: ProjectPlacementDomainSnapshot): Placeme
   };
 }
 
+export function todosToForm(domain: ProjectTodosDomainSnapshot): TodosFormState {
+  return {
+    fileCap: domain.stored.fileCap === undefined ? undefined : String(domain.stored.fileCap),
+    keywords: domain.stored.keywords ? formatTodoKeywords(domain.stored.keywords) : undefined,
+  };
+}
+
+/** Validation messages for overridden TODOs fields; a form with any cannot be saved. */
+export function todosFormErrors(form: TodosFormState): { fileCap?: string; keywords?: string } {
+  const fileCap = form.fileCap === undefined ? undefined : parseTodoFileCapInput(form.fileCap);
+  const keywords = form.keywords === undefined ? undefined : parseTodoKeywordsInput(form.keywords);
+  return {
+    ...(fileCap && !fileCap.ok ? { fileCap: fileCap.message } : {}),
+    ...(keywords && !keywords.ok ? { keywords: keywords.message } : {}),
+  };
+}
+
+export function todosToPatch(
+  form: TodosFormState,
+  touchedFields?: ReadonlySet<FormFieldPath>
+): ProjectSettingsDomainPatch['todos'] | undefined {
+  const stored: NonNullable<ProjectSettingsDomainPatch['todos']>['stored'] = {};
+  if (isTouched(touchedFields, 'todos.fileCap')) {
+    const parsed = form.fileCap === undefined ? undefined : parseTodoFileCapInput(form.fileCap);
+    if (!parsed) stored.fileCap = null;
+    else if (parsed.ok) stored.fileCap = parsed.value;
+  }
+  if (isTouched(touchedFields, 'todos.keywords')) {
+    const parsed = form.keywords === undefined ? undefined : parseTodoKeywordsInput(form.keywords);
+    if (!parsed) stored.keywords = null;
+    else if (parsed.ok) stored.keywords = parsed.value;
+  }
+  return Object.keys(stored).length > 0 ? { stored } : undefined;
+}
+
 export function projectSettingsDomainsToForm(
   domains: ProjectSettingsDomains,
   remotes: { name: string; url: string }[]
@@ -165,6 +213,7 @@ export function projectSettingsDomainsToForm(
     gitIdentity: gitIdentityToForm(domains.gitIdentity, remotes),
     integrationAccounts: domains.integrationAccounts.stored,
     issueFilters: domains.issueFilters.stored,
+    todos: todosToForm(domains.todos),
     placement: placementToForm(domains.placement),
   };
 }
@@ -290,6 +339,7 @@ export function formToProjectSettingsDomainPatch(
     )
   );
   const placement = placementToPatch(form.placement, touchedFields);
+  const todos = todosToPatch(form.todos, touchedFields);
   return {
     ...(lifecycle ? { lifecycle } : {}),
     ...(fileHandling ? { fileHandling } : {}),
@@ -299,6 +349,7 @@ export function formToProjectSettingsDomainPatch(
       ? { integrationAccounts: { stored: integrationAccounts } }
       : {}),
     ...(Object.keys(issueFilters).length > 0 ? { issueFilters: { stored: issueFilters } } : {}),
+    ...(todos ? { todos } : {}),
     ...(placement ? { placement } : {}),
   };
 }
