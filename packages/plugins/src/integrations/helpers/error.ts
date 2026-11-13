@@ -75,7 +75,7 @@ export function toIntegrationError(
   return { type: 'generic', message: fallback };
 }
 
-function getHttpStatus(error: unknown): number | undefined {
+export function getHttpStatus(error: unknown): number | undefined {
   if (!isHttpErrorLike(error)) return undefined;
 
   return (

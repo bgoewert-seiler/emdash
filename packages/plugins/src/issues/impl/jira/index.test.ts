@@ -121,6 +121,62 @@ describe('jira issues plugin', () => {
     });
   });
 
+  it('lists the issue whose key was searched ahead of issues that only mention it', async () => {
+    mockSearchForIssues.mockResolvedValueOnce({
+      issues: [jiraIssue('WEB-1000', 'Follow-up to WEB-994'), jiraIssue('WEB-994')],
+    });
+
+    const result = await issues.searchIssues(makeHost(), { searchTerm: 'web-994', limit: 5 });
+
+    expect(result).toEqual({
+      success: true,
+      data: [
+        expect.objectContaining({ identifier: 'WEB-994' }),
+        expect.objectContaining({ identifier: 'WEB-1000' }),
+      ],
+    });
+  });
+
+  it('falls back to a text search when Jira rejects a key that does not exist', async () => {
+    mockSearchForIssues
+      .mockRejectedValueOnce(
+        jiraError(400, "An issue with key 'WEB-99999' does not exist for field 'key'.")
+      )
+      .mockResolvedValueOnce({ issues: [jiraIssue('WEB-1000', 'Mentions WEB-99999')] });
+
+    const result = await issues.searchIssues(makeHost(), { searchTerm: 'WEB-99999', limit: 5 });
+
+    expect(result).toEqual({
+      success: true,
+      data: [expect.objectContaining({ identifier: 'WEB-1000' })],
+    });
+    expect(searchParams(1).jql).toBe(
+      '(text ~ "WEB-99999") AND (statusCategory != Done) ORDER BY updated DESC'
+    );
+  });
+
+  it('reports the error when the text search fallback for a key fails too', async () => {
+    mockSearchForIssues
+      .mockRejectedValueOnce(jiraError(400, 'bad key'))
+      .mockRejectedValueOnce(jiraError(400, "Field 'nope' does not exist."));
+
+    const result = await issues.searchIssues(makeHost(), { searchTerm: 'WEB-1', limit: 5 });
+
+    expect(result).toEqual({
+      success: false,
+      error: { type: 'generic', message: "Field 'nope' does not exist." },
+    });
+  });
+
+  it('does not retry a key search that failed for a reason other than a rejected query', async () => {
+    mockSearchForIssues.mockRejectedValueOnce(jiraError(401, 'unauthorized'));
+
+    const result = await issues.searchIssues(makeHost(), { searchTerm: 'WEB-1', limit: 5 });
+
+    expect(result).toMatchObject({ success: false, error: { type: 'auth_failed' } });
+    expect(mockSearchForIssues).toHaveBeenCalledTimes(1);
+  });
+
   it('searches plain text terms with escaped JQL text matching', async () => {
     mockSearchForIssues.mockResolvedValueOnce({
       issues: [],

@@ -1,6 +1,6 @@
 import { err, ok, type Result } from '@emdash/shared';
 import type { Version2Client, Version3Client } from 'jira.js';
-import { toIntegrationError } from '../../../integrations/helpers/error';
+import { getHttpStatus, toIntegrationError } from '../../../integrations/helpers/error';
 import type { ConnectedIntegrationHostContext } from '../../../integrations/host';
 import { createJiraClient, readJiraCredentials } from '../../../integrations/impl/jira/client';
 import {
@@ -66,23 +66,41 @@ export async function searchIssues(
 
   try {
     const escapedTerm = term.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
-    const termClause = JIRA_KEY_PATTERN.test(term)
-      ? `(key = "${escapedTerm}" OR text ~ "${escapedTerm}")`
-      : `text ~ "${escapedTerm}"`;
+    const textClause = `text ~ "${escapedTerm}"`;
+    const isKey = JIRA_KEY_PATTERN.test(term);
     const scope = await withEpicSubtasks(client, parsedCredentials.data, filters.data);
-    const jql = scopedJql([...scope, termClause]);
-    const issues = await searchJql(
-      client,
-      parsedCredentials.data,
-      jql,
-      clampIssueLimit(opts.limit, 20, 500)
-    );
+    const limit = clampIssueLimit(opts.limit, 20, 500);
+    const search = (termClause: string) =>
+      searchJql(client, parsedCredentials.data, scopedJql([...scope, termClause]), limit);
+
+    let issues: JiraIssue[];
+    if (isKey) {
+      try {
+        issues = await search(`(key = "${escapedTerm}" OR ${textClause})`);
+      } catch (error) {
+        // Jira rejects `key = X` with a 400 when X does not exist, which a key still being typed
+        // usually doesn't; a broken filter fails the text search too and is reported from there.
+        if (getHttpStatus(error) !== 400) throw error;
+        issues = await search(textClause);
+      }
+      issues = exactKeyFirst(issues, term);
+    } else {
+      issues = await search(textClause);
+    }
 
     return ok(issues.map((issue) => toIssueData(issue, parsedCredentials.data.siteUrl)));
   } catch (error) {
     host.log.warn('Jira searchIssues failed', { error });
     return err(toIntegrationError(error, 'Jira', 'Unable to search Jira issues.'));
   }
+}
+
+/** Issues that only mention the key may be updated more recently than the issue itself. */
+function exactKeyFirst(issues: JiraIssue[], key: string): JiraIssue[] {
+  const wanted = key.toUpperCase();
+  const index = issues.findIndex((issue) => issue.key.toUpperCase() === wanted);
+  if (index <= 0) return issues;
+  return [issues[index], ...issues.slice(0, index), ...issues.slice(index + 1)];
 }
 
 /** The account's filter, narrowed by the project's; both are optional. */
