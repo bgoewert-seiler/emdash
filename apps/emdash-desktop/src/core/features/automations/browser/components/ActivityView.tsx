@@ -31,13 +31,13 @@ import {
   projectData,
   projectDisplayName,
 } from '@core/features/projects/api/browser/stores/project-selectors';
-import { TaskGitDiffStats } from '@core/features/tasks/contributions/browser/task-git-diff-stats';
 import type { TaskStore } from '@core/features/tasks/api/browser/stores/task-store';
 import {
   getRegisteredTaskData,
   getTaskIdForAutomationRun,
   getTaskStore,
 } from '@core/features/tasks/api/browser/task-state/task-selectors';
+import { TaskGitDiffStats } from '@core/features/tasks/contributions/browser/task-git-diff-stats';
 import { taskViewDef } from '@core/features/tasks/contributions/views';
 import type { AgentStatus } from '@core/primitives/agents/api';
 import type { Automation } from '@core/primitives/automations/api';
@@ -310,13 +310,14 @@ export function resolveActivityItemStatus(
   taskId: string | null;
   taskStore: TaskStore | undefined;
 } {
-  const { taskId, taskStore, agentStatus: adoptedAgentStatus } = taskLookup(
-    item.projectId,
-    item.run.id
-  );
+  const {
+    taskId,
+    taskStore,
+    agentStatus: adoptedAgentStatus,
+  } = taskLookup(item.projectId, item.run.id);
 
   const convId = item.run.conversationId;
-  const liveAgentStatus = convId ? conversationStatuses.get(convId) ?? null : null;
+  const liveAgentStatus = convId ? (conversationStatuses.get(convId) ?? null) : null;
   const agentStatus = adoptedAgentStatus ?? liveAgentStatus;
 
   const isSessionActive = convId
@@ -455,7 +456,7 @@ export const ActivityView = observer(function ActivityView({
   return (
     <div className="flex w-full flex-col gap-4">
       {errors.length > 0 && (
-        <div className="flex items-center gap-2 rounded-md bg-destructive/10 px-3 py-2 text-xs text-destructive">
+        <div className="bg-destructive/10 text-destructive flex items-center gap-2 rounded-md px-3 py-2 text-xs">
           <AlertCircle className="size-4 shrink-0" />
           <span>Failed to load run history for some automations.</span>
         </div>
@@ -568,7 +569,7 @@ export const ActivityRow = observer(function ActivityRow({
 
   const interactive = Boolean(
     (taskId && !task?.archivedAt) ||
-      (!taskId && runtimeAvailable && isAutomationRunAdoptable(run) && !isAdopting)
+    (!taskId && runtimeAvailable && isAutomationRunAdoptable(run) && !isAdopting)
   );
 
   const projectStore = getProjectStore(projectId);
@@ -634,7 +635,7 @@ export const ActivityRow = observer(function ActivityRow({
 
           <div className="flex items-center gap-1 text-xs text-foreground-muted">
             <Folder className="size-3 shrink-0" />
-            <span className="truncate max-w-40">{projectName}</span>
+            <span className="max-w-40 truncate">{projectName}</span>
           </div>
         </div>
 
@@ -684,7 +685,7 @@ export const ActivityRow = observer(function ActivityRow({
 
       {/* Error message if failed */}
       {run.error && (
-        <div className="rounded bg-destructive/10 px-2.5 py-1 text-xs text-destructive">
+        <div className="bg-destructive/10 text-destructive rounded px-2.5 py-1 text-xs">
           {formatRunError(run.error)}
         </div>
       )}

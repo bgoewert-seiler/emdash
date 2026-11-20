@@ -177,7 +177,6 @@ export function AutomationsView() {
                 )}
               </view.Root>
             )}
-
           </div>
         </div>
       </div>

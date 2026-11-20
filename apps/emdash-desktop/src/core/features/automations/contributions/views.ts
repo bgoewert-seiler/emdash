@@ -14,4 +14,3 @@ export const automationsViewDef = defineView({
   layout: workbenchLayout,
   telemetryEvent: 'automations_viewed',
 });
-

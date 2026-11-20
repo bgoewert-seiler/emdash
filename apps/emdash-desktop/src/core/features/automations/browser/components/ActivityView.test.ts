@@ -1,12 +1,8 @@
 import { LOCAL_HOST_REF } from '@emdash/core/primitives/host/api';
+import { describe, expect, it } from 'vitest';
 import type { AutomationRun } from '@core/features/automations/api/automation-run';
 import type { Automation } from '@core/primitives/automations/api';
-import { describe, expect, it } from 'vitest';
-import {
-  getActivityStatus,
-  resolveActivityItemStatus,
-  type ActivityItem,
-} from './ActivityView';
+import { getActivityStatus, resolveActivityItemStatus, type ActivityItem } from './ActivityView';
 
 describe('ActivityView', () => {
   describe('getActivityStatus', () => {
@@ -31,18 +27,18 @@ describe('ActivityView', () => {
     it('does not treat unknown agent status on unadopted done runs as proof of completion', () => {
       // Unadopted done runs default to working since the executor marked done upon starting session
       expect(getActivityStatus('done', null)).toBe('working');
-      expect(
-        getActivityStatus('done', null, { hasTask: false, isSessionActive: undefined })
-      ).toBe('working');
+      expect(getActivityStatus('done', null, { hasTask: false, isSessionActive: undefined })).toBe(
+        'working'
+      );
     });
 
     it('returns done when agent completed, task is adopted, or session closed', () => {
       expect(getActivityStatus('done', 'completed')).toBe('done');
       expect(getActivityStatus('done', 'idle')).toBe('done');
       expect(getActivityStatus('done', null, { hasTask: true })).toBe('done');
-      expect(
-        getActivityStatus('done', null, { hasTask: false, isSessionActive: false })
-      ).toBe('done');
+      expect(getActivityStatus('done', null, { hasTask: false, isSessionActive: false })).toBe(
+        'done'
+      );
     });
 
     it('preserves queued, cancelled, and skipped statuses', () => {

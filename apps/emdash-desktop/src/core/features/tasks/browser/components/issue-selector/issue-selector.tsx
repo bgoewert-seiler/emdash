@@ -93,7 +93,9 @@ export function IssueRow({ issue, linkedTo }: { issue: LinkedIssue; linkedTo?: L
         {issue.status ? (
           <Tooltip.Root>
             <Tooltip.Trigger
-              render={<IssueStatusIndicator status={toIssueStatus(issue.status, issue.statusCategory)} />}
+              render={
+                <IssueStatusIndicator status={toIssueStatus(issue.status, issue.statusCategory)} />
+              }
             />
             <Tooltip.Content>{issue.status}</Tooltip.Content>
           </Tooltip.Root>
