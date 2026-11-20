@@ -117,9 +117,8 @@ export class GitRepositoryRuntime {
     selector: RepositorySelector,
     read: (resource: RepositoryResource) => Promise<T>
   ) {
-    return this.run(
-      selector,
-      async (resource): Promise<Result<T, never>> => ok(await read(resource))
+    return this.run(selector, async (resource): Promise<Result<T, never>> =>
+      ok(await read(resource))
     );
   }
 
