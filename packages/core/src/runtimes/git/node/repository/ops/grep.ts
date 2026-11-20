@@ -3,6 +3,7 @@ import { ExclusionPolicy } from '#primitives/exclusion-policy/api';
 import { parsePortableRelativePath } from '#primitives/path/api';
 import {
   GREP_MAX_OUTPUT_BYTES,
+  GREP_TIMEOUT_MS,
   type GitCommandError,
   type GrepHit,
   type GrepResult,
@@ -16,6 +17,8 @@ export type GrepOptions = {
   exclusions?: readonly string[];
   /** Test seam for the output cap. */
   maxOutputBytes?: number;
+  /** Test seam for the time limit. */
+  timeoutMs?: number;
 };
 
 /**
@@ -24,7 +27,8 @@ export type GrepOptions = {
  * Argv only: `--end-of-options` keeps a ref
  * that starts with `-` from reading as an option, and every pattern follows its own `-e`.
  * `-I` skips binary files and `--null` keeps paths with `:` parseable. Exit code 1 means no
- * match. Output past the byte cap stops the process and reports `truncated`.
+ * match. Output past the byte cap stops the process and reports `truncated`; a search past the
+ * time limit is killed and fails, since a pattern can backtrack for far longer than any listing.
  */
 export async function grep(
   exec: BoundExec,
@@ -52,22 +56,26 @@ export async function grep(
   let bytes = 0;
   let truncated = false;
   try {
-    await exec.execStreaming(args, (chunk) => {
-      const size = Buffer.byteLength(chunk);
-      if (bytes + size > maxBytes) {
-        // The parser drops the record cut at the cap.
-        parser.push(
-          Buffer.from(chunk)
-            .subarray(0, maxBytes - bytes)
-            .toString('utf8')
-        );
-        truncated = true;
-        return false;
-      }
-      bytes += size;
-      parser.push(chunk);
-      return true;
-    });
+    await exec.execStreaming(
+      args,
+      (chunk) => {
+        const size = Buffer.byteLength(chunk);
+        if (bytes + size > maxBytes) {
+          // The parser drops the record cut at the cap.
+          parser.push(
+            Buffer.from(chunk)
+              .subarray(0, maxBytes - bytes)
+              .toString('utf8')
+          );
+          truncated = true;
+          return false;
+        }
+        bytes += size;
+        parser.push(chunk);
+        return true;
+      },
+      { timeoutMs: options.timeoutMs ?? GREP_TIMEOUT_MS }
+    );
   } catch (error) {
     const failure = gitFailure(error);
     if (failure.exitCode !== 1 || failure.stderr.trim()) return commandFailure(failure);

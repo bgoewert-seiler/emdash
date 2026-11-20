@@ -111,6 +111,7 @@ export type {
 } from '#runtimes/git/api/repository/schemas';
 export {
   GREP_MAX_OUTPUT_BYTES,
+  GREP_TIMEOUT_MS,
   gitTreeEntrySchema,
   grepInputSchema,
   listTreeInputSchema,

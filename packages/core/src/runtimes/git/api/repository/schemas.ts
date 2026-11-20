@@ -68,6 +68,8 @@ export const GREP_MAX_PATHSPECS = 8;
 export const GREP_MAX_EXCLUSIONS = 500;
 /** Output beyond this is dropped and reported as `truncated`. */
 export const GREP_MAX_OUTPUT_BYTES = 4 * 1024 * 1024;
+/** A search still running after this is stopped and fails, so a costly pattern cannot hang a listing. */
+export const GREP_TIMEOUT_MS = 30_000;
 
 /** One argv element; NUL and newlines would break git's line-oriented pattern and output. */
 const grepArgSchema = z

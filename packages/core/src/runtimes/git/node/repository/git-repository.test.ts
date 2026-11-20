@@ -522,5 +522,24 @@ describe('GitRepository', () => {
         await setup.cleanup();
       }
     });
+
+    it('fails a search that runs past its time limit instead of waiting on it', async () => {
+      const setup = await makeRepository();
+      try {
+        const lines = Array.from({ length: 20_000 }, (_, i) => `// TODO item ${i}`).join('\n');
+        await writeFile(path.join(setup.repo, 'many.ts'), `${lines}\n`);
+        await git(setup.repo, ['add', '.']);
+        await git(setup.repo, ['commit', '-m', 'many']);
+        const { grep } = await import('./ops/grep');
+        const exec = bindGitDir(
+          createBoundExec({ file: 'git', cwd: tmpdir() }),
+          path.join(setup.repo, '.git')
+        );
+        const result = await grep(exec, 'HEAD', { patterns: ['TODO'], timeoutMs: 1 });
+        expect(result).toMatchObject({ success: false });
+      } finally {
+        await setup.cleanup();
+      }
+    });
   });
 });
