@@ -32,7 +32,7 @@ The system SHALL list each unchecked checklist item (`- [ ]` or `* [ ]`, at any 
 - **THEN** its items are not listed
 
 ### Requirement: Keyword comments from source files
-The system SHALL list each line that holds a configured keyword directly after a comment opener as one issue. Recognized openers are `//`, `/*`, a leading `*` inside a block comment, `#`, `<!--`, `--`, `;`, `%`, `{{!--`, `{{!`, `(*`, `{-`, `'` and `REM`. The keyword MAY be followed by `:`, an owner in parentheses, or whitespace, and SHALL NOT be followed by a letter, digit or underscore.
+The system SHALL list each line that holds a configured keyword directly after a comment opener as one issue. Recognized openers are `//`, `/*`, a leading `*` inside a block comment, `#`, `<!--`, `--`, `;`, `%`, `{{!--`, `{{!`, `(*`, `{-`, `REM`, and `'` in Visual Basic files. An opener inside a quoted string, or inside a Markdown code span, is not a comment. The keyword MAY be followed by `:`, an owner in parentheses, or whitespace, and SHALL NOT be followed by a letter, digit or underscore.
 
 #### Scenario: Line comment
 - **WHEN** `src/app.ts` line 42 is `const x = 1; // TODO: handle empty input`
@@ -49,6 +49,10 @@ The system SHALL list each line that holds a configured keyword directly after a
 #### Scenario: Keyword in prose or identifiers is ignored
 - **WHEN** a line reads `const todoList = []`, `Add a TODO app`, or `TODOS: none` with no comment opener before the keyword or with letters after it
 - **THEN** the line is not listed
+
+#### Scenario: Keyword in a string literal is ignored
+- **WHEN** a TypeScript line reads `keywords: ['TODO']` or `['a.py', '# TODO fix']`
+- **THEN** the line is not listed, while `const s = '#'; // TODO: real one` is listed
 
 #### Scenario: Markdown headings are not comments
 - **WHEN** a Markdown file contains the heading `# TODO list`
