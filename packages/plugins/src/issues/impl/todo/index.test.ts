@@ -394,4 +394,33 @@ describe('TODOs issues plugin: branches', () => {
       })
     ).toMatchObject({ success: false, error: { type: 'not_found_or_no_access' } });
   });
+
+  it('stops scanning branches once their hits pass the scan budget', async () => {
+    // One 1 MiB keyword line per branch, too long to list but counted; the budget is 16 MiB.
+    const bulky = `// TODO: ${'a'.repeat(1024 * 1024)}\n`;
+    const refs = Array.from({ length: 40 }, (_, i) => ({
+      branch: local(`bulk/${String(i).padStart(2, '0')}`, `o${i}`),
+      files: { 'src/bulk.ts': `${bulky}// TODO: only on ${i}\n` },
+    }));
+    const git = projectGit(refs, head);
+    const grepped: string[] = [];
+    const counting: ProjectGitReader = {
+      ...git,
+      grep: async (branch, patterns, opts) => {
+        grepped.push(label(branch));
+        return git.grep(branch, patterns, opts);
+      },
+    };
+    const data = await list({
+      limit: 500,
+      projectFiles: projectFiles(head),
+      projectGit: counting,
+      todoSettings: settings,
+    });
+    const titles = data.map((issue) => issue.title);
+    expect(titles).toContain('only on 0');
+    expect(titles).not.toContain('only on 39');
+    expect(new Set(grepped).size).toBeLessThan(40);
+  });
 });
+

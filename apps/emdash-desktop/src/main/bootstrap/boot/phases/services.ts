@@ -62,7 +62,11 @@ import {
   type ProjectFileSearch,
 } from '@core/features/issues/node/project-file-search';
 import { createProjectFilesReader } from '@core/features/issues/node/project-files-reader';
-import { createProjectGitReader } from '@core/features/issues/node/project-git-reader';
+import {
+  createGrepCache,
+  createProjectGitReader,
+  type GrepCache,
+} from '@core/features/issues/node/project-git-reader';
 import { createIssueProviderRegistry } from '@core/features/issues/node/registry';
 import {
   createPromptLibraryService,
@@ -630,6 +634,16 @@ export async function bootServices(
     }
     return search;
   };
+  // Readers are created per call, so branch grep results live here, one cache per attached project.
+  const projectGrepCaches = new WeakMap<object, GrepCache>();
+  const projectGrepCache = (project: object) => {
+    let cache = projectGrepCaches.get(project);
+    if (!cache) {
+      cache = createGrepCache();
+      projectGrepCaches.set(project, cache);
+    }
+    return cache;
+  };
   const issueProviders = createIssueProviderRegistry({
     resolveProjectIntegrationAccount,
     // A filter saved in project settings overrides the repository's .jira.toml scope.
@@ -666,6 +680,7 @@ export async function bootServices(
         hasRepository: project.hasRepository,
         getBaseRemote: () => project.gitRepository.getBaseRemote(),
         getSearchExclusions,
+        grepCache: projectGrepCache(project),
       });
     },
   });

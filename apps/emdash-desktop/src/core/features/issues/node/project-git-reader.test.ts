@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { GitRuntimeClient } from '@core/services/runtime-broker/api/clients';
-import { createProjectGitReader } from './project-git-reader';
+import { createGrepCache, createProjectGitReader } from './project-git-reader';
 
 const origin = { name: 'origin', url: 'git@example.com:acme/repo.git' };
 const REFS = {
@@ -14,7 +14,7 @@ const REFS = {
   remoteHeads: [{ remote: 'origin', ref: 'refs/remotes/origin/main' }],
 };
 
-function setup(hasRepository = true) {
+function setup(hasRepository = true, grepCache = createGrepCache()) {
   const listTree = vi.fn(async () => ({
     success: true as const,
     data: { entries: [{ name: 'add-thing', kind: 'tree' as const, oid: 't1' }] },
@@ -48,6 +48,7 @@ function setup(hasRepository = true) {
     hasRepository,
     getBaseRemote: async () => 'origin',
     getSearchExclusions: async () => ['node_modules'],
+    grepCache,
   });
   return { reader, listTree, getFile, grep };
 }
@@ -106,6 +107,55 @@ describe('createProjectGitReader', () => {
         exclusions: ['node_modules'],
       })
     );
+  });
+
+  it('answers a repeated branch grep from the cache, keyed by the branch tip', async () => {
+    const cache = createGrepCache();
+    const first = setup(true, cache);
+    const [, featureX] = (await first.reader.listBranches()) ?? [];
+    if (!featureX) throw new Error('expected branches');
+    const expected = {
+      hits: [{ path: 'src/a.ts', line: 3, text: '// TODO: x' }],
+      truncated: false,
+    };
+    expect(await first.reader.grep(featureX, ['TODO'])).toEqual(expected);
+    // A new reader for the same project, as each listing creates, still hits the cache.
+    const second = setup(true, cache);
+    expect(await second.reader.grep(featureX, ['TODO'])).toEqual(expected);
+    expect(second.grep).not.toHaveBeenCalled();
+    await second.reader.grep(featureX, ['FIXME']);
+    expect(second.grep).toHaveBeenCalledTimes(1);
+  });
+
+  it('greps again once the branch tip moves', async () => {
+    const cache = createGrepCache();
+    const { reader, grep } = setup(true, cache);
+    const [, featureX] = (await reader.listBranches()) ?? [];
+    if (!featureX) throw new Error('expected branches');
+    await reader.grep(featureX, ['TODO']);
+    const moved = REFS.branches[1];
+    if (!moved) throw new Error('expected branches');
+    const original = moved.oid;
+    moved.oid = 'b3';
+    try {
+      await reader.grep(featureX, ['TODO']);
+    } finally {
+      moved.oid = original;
+    }
+    expect(grep).toHaveBeenCalledTimes(2);
+  });
+
+  it('evicts the oldest results to stay under its byte limit', async () => {
+    // Room for one 18-byte result, not two.
+    const cache = createGrepCache(30);
+    const { reader, grep } = setup(true, cache);
+    const branches = (await reader.listBranches()) ?? [];
+    const [, featureX, , featureY] = branches;
+    if (!featureX || !featureY) throw new Error('expected branches');
+    await reader.grep(featureX, ['TODO']);
+    await reader.grep(featureY, ['TODO']);
+    await reader.grep(featureX, ['TODO']);
+    expect(grep).toHaveBeenCalledTimes(3);
   });
 
   it('refuses to grep a branch that is not in the repository', async () => {

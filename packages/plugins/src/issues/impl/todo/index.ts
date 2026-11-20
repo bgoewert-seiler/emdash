@@ -35,6 +35,11 @@ const DEFAULT_SETTINGS: TodoSourceSettings = {
 };
 const READ_CONCURRENCY = 8;
 const MAX_SCANNED_BRANCHES = 200;
+/**
+ * Hit bytes all branch scans may hold together. Each grep is capped on its own, but 200 branches
+ * of capped output would hold gigabytes, so scanning stops once this is spent.
+ */
+const BRANCH_SCAN_BUDGET_BYTES = 16 * 1024 * 1024;
 const TODO_MD_LOOKUP_LIMIT = 200;
 const CONTEXT_LINES = 10;
 /** The host readers cap one read at 256 KiB; a file that reaches it was cut short. */
@@ -175,6 +180,14 @@ async function grepRef(
   };
 }
 
+function scanBytes(scan: BranchScan): number {
+  let bytes = 0;
+  for (const hit of [...scan.comments, ...scan.checklists]) {
+    bytes += hit.path.length + hit.text.length;
+  }
+  return bytes;
+}
+
 function hitKey(kind: Kind, hit: ProjectTextHit): string {
   return `${kind}\0${hit.path}\0${hit.line}\0${hit.text}`;
 }
@@ -207,10 +220,23 @@ async function readBranchItems(
       });
     }
     const scanned = unique.slice(0, MAX_SCANNED_BRANCHES);
+    let spent = 0;
+    let skipped = 0;
     const [head, scans] = await Promise.all([
       grepRef(git, 'HEAD', settings),
-      mapWithConcurrency(scanned, READ_CONCURRENCY, (branch) => grepRef(git, branch, settings)),
+      mapWithConcurrency(scanned, READ_CONCURRENCY, async (branch) => {
+        if (spent >= BRANCH_SCAN_BUDGET_BYTES) {
+          skipped += 1;
+          return null;
+        }
+        const scan = await grepRef(git, branch, settings);
+        if (scan) spent += scanBytes(scan);
+        return scan;
+      }),
     ]);
+    if (skipped > 0) {
+      host.log.info('TODO branch scan stopped at its budget', { skipped, scanned: scanned.length });
+    }
     const seen = new Set<string>([
       ...(head?.comments ?? []).map((hit) => hitKey('code', hit)),
       ...(head?.checklists ?? []).map((hit) => hitKey('md', hit)),

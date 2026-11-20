@@ -5,7 +5,7 @@ import {
   type GitBranch,
   type RepositorySelector,
 } from '@emdash/core/runtimes/git/api';
-import type { ProjectGitReader, SourceBranch } from '@emdash/plugins/issues';
+import type { ProjectGitReader, ProjectTextHit, SourceBranch } from '@emdash/plugins/issues';
 import { portablePath } from '@core/primitives/desktop-runtime/api';
 import type { GitRuntimeClient } from '@core/services/runtime-broker/api/clients';
 
@@ -20,7 +20,54 @@ export type ProjectGitReaderOptions = {
   getBaseRemote: () => Promise<string | null>;
   /** The app's search exclusions, applied to `grep` as they are to content search. */
   getSearchExclusions?: () => Promise<readonly string[]>;
+  /** Branch grep results kept across readers of one project; see `createGrepCache`. */
+  grepCache?: GrepCache;
 };
+
+type GrepOutput = { hits: ProjectTextHit[]; truncated: boolean };
+
+export type GrepCache = {
+  get(key: string): GrepOutput | undefined;
+  set(key: string, value: GrepOutput): void;
+};
+
+/** Enough for typical TODO scans of a few hundred branches. */
+const DEFAULT_GREP_CACHE_BYTES = 16 * 1024 * 1024;
+
+/**
+ * Branch grep results keyed by commit, so typing a search in the TODO picker does not re-run git
+ * on every branch. A commit's content never changes, so an entry is only ever evicted for space,
+ * oldest use first.
+ */
+export function createGrepCache(maxBytes = DEFAULT_GREP_CACHE_BYTES): GrepCache {
+  const entries = new Map<string, { value: GrepOutput; bytes: number }>();
+  let total = 0;
+  return {
+    get(key) {
+      const entry = entries.get(key);
+      if (!entry) return undefined;
+      entries.delete(key);
+      entries.set(key, entry);
+      return entry.value;
+    },
+    set(key, value) {
+      const bytes = value.hits.reduce((sum, hit) => sum + hit.path.length + hit.text.length, 0);
+      const previous = entries.get(key);
+      if (previous) {
+        entries.delete(key);
+        total -= previous.bytes;
+      }
+      if (bytes > maxBytes) return;
+      for (const [oldest, entry] of entries) {
+        if (total + bytes <= maxBytes) break;
+        entries.delete(oldest);
+        total -= entry.bytes;
+      }
+      entries.set(key, { value, bytes });
+      total += bytes;
+    },
+  };
+}
 
 /**
  * Exposes a project's branches to issue plugins without checking anything out. Plugins hand back
@@ -85,20 +132,30 @@ export function createProjectGitReader(options: ProjectGitReaderOptions): Projec
 
     async grep(branch, patterns, opts = {}) {
       if (!options.hasRepository) return null;
-      const ref = branch === 'HEAD' ? 'HEAD' : (await resolve(branch))?.ref;
+      const resolved = branch === 'HEAD' ? null : await resolve(branch);
+      const ref = branch === 'HEAD' ? 'HEAD' : resolved?.ref;
       if (!ref) return null;
       const exclusions = (await options.getSearchExclusions?.().catch(() => [])) ?? [];
+      const pathspec = opts.pathspec ?? [];
+      // `HEAD` moves without a new branch object, so only resolved commits are cached.
+      const key = resolved
+        ? JSON.stringify([resolved.oid, patterns, pathspec, exclusions])
+        : undefined;
+      const cached = key === undefined ? undefined : options.grepCache?.get(key);
+      if (cached) return cached;
       const result = await git.repository.grep({
         ...repository,
         ref,
         patterns,
-        pathspec: opts.pathspec ?? [],
+        pathspec,
         exclusions: [...exclusions],
       });
       if (!result.success) return null;
       // Git output is re-validated so a crafted tree path never reaches a later read.
       const hits = result.data.hits.filter((hit) => safePath(hit.path) !== null);
-      return { hits, truncated: result.data.truncated };
+      const output = { hits, truncated: result.data.truncated };
+      if (key !== undefined) options.grepCache?.set(key, output);
+      return output;
     },
 
     async grepWorkingTree(patterns, opts = {}) {
